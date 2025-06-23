@@ -1,0 +1,16 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "https://cloudsharing.vercel.app"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin",
+      "Access-Control-Allow-Headers",
+      "Access-Control-Allow-Credentials"
+    ]
+  }
+]

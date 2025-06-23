@@ -1,0 +1,508 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+
+body{
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* --------------------icon change ----------------- */
+/* CSS Transitions */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+/* Additional styling for rotating the close icon */
+.transform {
+  transform: rotate(0deg);
+}
+
+
+/* ------------------------Menu Icon-------------------------------------------- */
+.menu-icon {
+  transition: transform 0.3s ease;
+}
+
+.menu-icon:hover {
+  transform: scale(1.2);
+}
+
+/* -------------------------------------------------------------------- */
+.fixed {
+  position: fixed;
+}
+.bottom-0 {
+  bottom: 0;
+}
+.left-0 {
+  left: 0;
+}
+.right-0 {
+  right: 0;
+}
+.p-4 {
+  padding: 1rem;
+}
+.bg-gray-800 {
+  background-color: #2d3748;
+}
+.text-white {
+  color: #ffffff;
+}
+.flex {
+  display: flex;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.items-center {
+  align-items: center;
+}
+.bg-blue-500 {
+  background-color: #4299e1;
+}
+.bg-red-500 {
+  background-color: #f56565;
+}
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.rounded {
+  border-radius: 0.25rem;
+}
+.mr-2 {
+  margin-right: 0.5rem;
+}
+.z-50 {
+  z-index: 50;
+}
+
+/* styles/globals.css */
+.cookie-consent-popup {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  background-color: #2d3748;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 50;
+}
+
+.cookie-consent-popup div {
+  text-align: center;
+}
+
+.cookie-consent-popup button {
+  background-color: #4299e1;
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.cookie-consent-popup button:nth-child(2) {
+  background-color: #f56565;
+}
+
+@media (min-width: 768px) {
+  .cookie-consent-popup {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .cookie-consent-popup div {
+    text-align: left;
+  }
+
+  .cookie-consent-popup button {
+    margin: 0 0.5rem;
+  }
+}
+
+/* -------------------------------------------------------------------- */
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.Herosection {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Light mode styles */
+@media (prefers-color-scheme: light) {
+  .light-mode-label {
+    /* Add light mode specific styles here */
+    background-color: #f3f4f6;
+    border-color: #cbd5e0;
+    color: #4a5568;
+  }
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .dark-mode-label {
+    /* Add dark mode specific styles here */
+    background-color: #4a5568;
+    border-color: #2d3748;
+    color: #cbd5e0;
+  }
+}
+
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+.menu-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0s linear 0.3s;
+  padding: 2rem; /* Increased padding to make the menu larger */
+  border-radius: 20px; /* Added border-radius for curved appearance */
+}
+
+.menu-container.open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.3s;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.menu-item {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e5e5;
+  color: #333333;
+  text-decoration: none;
+  transition: background-color 0.3s;
+}
+
+.menu-item:hover {
+  background-color: #f5f5f5;
+}
+
+.bg-pattern {
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+button {
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+
+/* Add this CSS code to your global CSS file or inside a style tag in your component */
+
+@keyframes rotateCircle {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: rotate(180deg);
+    opacity: 0.5;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 1;
+  }
+}
+
+@keyframes showCheckmark {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.circle {
+  display: inline-block;
+  border: 2px solid blue;
+  border-radius: 50%;
+  padding: 3px;
+  animation: rotateCircle 1s ease-in-out;
+}
+
+.checkmark {
+  color: blue;
+  font-size: 1.0em;
+  animation: showCheckmark 0.5s ease-in-out;
+  animation-delay: 1s;
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+
+@keyframes typing {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background-color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #90a4ae;
+  border-radius: 50%;
+}
+
+.typing-dot:nth-child(1) {
+  animation: typing 1s infinite 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation: typing 1s infinite 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation: typing 1s infinite 0.4s;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rotateIcon {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-trigger {
+  transition: background-color 0.3s ease;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+.chat-trigger::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(to right, #2563eb, #3b82f6);
+  filter: blur(8px);
+  opacity: 0;
+  z-index: -1;
+  border-radius: inherit;
+  transition: opacity 0.2s;
+}
+
+.chat-trigger:hover::after {
+  opacity: 0.5;
+}
+
+.chat-trigger.open {
+  animation: rotateIcon 0.3s ease forwards;
+}
+
+.chat-trigger.close {
+  animation: rotateIcon 0.3s ease reverse;
+}
+
+/* Message Animation */
+@keyframes buttonPop {
+  0% { transform: scale(0.95); }
+  40% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.chat-trigger:active {
+  animation: buttonPop 0.2s ease-out;
+}
+
+.faq-button {
+  background: white;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.faq-button:hover {
+  background: linear-gradient(to right, #f0f9ff, #e0f2fe);
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.faq-button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #3b82f6, #60a5fa);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.faq-button:hover::before {
+  opacity: 1;
+}
+
+.faq-section {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.faq-title {
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+}
+
+.chat-background {
+  background-color: #f8fafc;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4l-2-2V24v-2l2-2v-4l-2-2V8l4-4 4 4v6l-2 2v4l2 2v2l-2 2v4l2 2v6l-4 4-4-4v-6l2-2zm0-18l-2 2v4l2-2v-4zm0 14l-2 2v4l2-2v-4zm8-14l-2 2v4l2-2v-4zm0 14l-2 2v4l2-2v-4z' fill='%239BA3AF' fill-opacity='0.1'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.chat-bubble-user {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  position: relative;
+}
+
+.chat-bubble-bot {
+  background: white;
+  border-radius: 18px 18px 18px 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  position: relative;
+}
+
+.chat-section {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+/* Combined Upload Progress Styles */
+.combined-upload-progress {
+  width: 100%;
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  transition: width 0.3s ease;
+  border-radius: 2px;
+  position: relative;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.upload-status {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 8px;
+  text-align: center;
+}

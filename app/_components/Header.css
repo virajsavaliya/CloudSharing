@@ -1,0 +1,25 @@
+header {
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 0 0 10px 10px;
+  }
+  
+  header .logo img {
+    max-width: 100%;
+  }
+  
+  header .start-btn {
+    text-decoration: none;
+    background-color: #007bff;
+    color: #fff;
+    padding: 0.7rem 1.5rem;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+  }
+  
+  header .start-btn:hover {
+    background-color: #0056b3;
+  }

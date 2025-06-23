@@ -1,0 +1,241 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(to bottom, white 72%, rgb(193, 215, 245) 82%);
+}
+
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 0 0 10px 10px;
+}
+
+nav .logo img {
+    max-width: 100%;
+}
+
+nav .start-btn {
+    text-decoration: none;
+    background-color: #007bff;
+    color: #fff;
+    padding: 0.7rem 1.5rem;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+nav .start-btn:hover {
+    background-color: #0056b3;
+}
+
+.hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4rem 2rem;
+    margin: 2rem auto;
+    max-width: 1200px;
+}
+
+.hero .left {
+    max-width: 50%;
+    color: rgb(10, 35, 65);
+}
+
+.hero .left h1 {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+}
+
+.hero .left p {
+    font-size: 1.2rem;
+    margin: 1.5rem 0;
+}
+
+.hero .left .buttons {
+    margin-top: 2rem;
+}
+
+.hero .left .buttons button {
+    margin-right: 1rem;
+    padding: 0.8rem 1.8rem;
+    font-size: 1rem;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.hero .left .buttons .get-started {
+    background-color: #007bff;
+}
+
+.hero .left .buttons .get-started:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+.hero .left .buttons .features {
+    background-color: #555;
+}
+
+.hero .left .buttons .features:hover {
+    background-color: #333;
+    transform: scale(1.05);
+}
+
+.hero .right {
+    max-width: 50%;
+    min-width: 300px;
+    text-align: center;
+}
+
+.hero .right img {
+    max-width: 120%;
+    height: auto;
+    display: block;
+}
+
+.features-section {
+    padding: 4rem 2rem;
+    margin: 2rem auto;
+    max-width: 1200px;
+}
+
+.features-section h2 {
+    margin-bottom: 5rem;
+    color: rgb(10, 35, 65);
+    font-size: 2rem;
+    text-align: center;
+}
+
+.features-section .cards {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-bottom: 3rem;
+}
+
+.features-section .card {
+    background-color: #ffff;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    flex: 1 1 calc(30% - 1rem);
+    max-width: calc(30% - 1rem);
+    position: relative;
+}
+
+.features-section .card:before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 2rem;
+    color: white;
+    width: 70px;
+    height: 70px;
+    background-color: #007bff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.features-section .card h3 {
+    font-size: 1.5rem;
+    margin: 2rem 0 1rem;
+    color: #007bff;
+}
+
+.features-section .card p {
+    font-size: 1rem;
+    color: #555;
+}
+
+.card-1:before {
+    content: "\f0c5";
+}
+
+.card-2:before {
+    content: "\f023";
+}
+
+.card-3:before {
+    content: "\f3ed";
+}
+
+footer {
+    background-color: rgb(10, 35, 65);
+    color: #fff;
+    padding: 1rem 1rem;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    body {
+        font-family: 'Roboto', sans-serif;
+        line-height: 1.6;
+        color: #333;
+        background: linear-gradient(to bottom, white 66%, rgb(193, 215, 245) 70%);
+    }
+
+    nav .logo img {
+        max-width: 80%;
+    }
+
+    nav .logo {
+        font-weight: bold;
+        color: #007bff;
+        max-width: 50%;
+        display: flex;
+        align-items: center;
+    }
+
+    .hero {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .hero .right img {
+        display: none;
+    }
+
+    .features-section .cards {
+        display: flex;
+        gap: 3.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding-bottom: 3rem;
+    }
+
+    .hero .left {
+        max-width: 100%;
+    }
+
+    .features-section .cards {
+        flex-direction: column;
+    }
+
+    .features-section .card {
+        max-width: 100%;
+    }
+}
