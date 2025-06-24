@@ -35,3 +35,4 @@ coverage
 *.swo
 *.log
 *.tsbuildinfo
+.vercel
