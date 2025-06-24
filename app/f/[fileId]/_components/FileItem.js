@@ -56,6 +56,22 @@ function FileItem({ file }) {
     }
   };
 
+  const handleSingleFileDownload = async () => {
+    if (!file?.fileUrl) return;
+    try {
+      setDownloading(true);
+      const response = await fetch(file.fileUrl, { mode: "cors" });
+      if (!response.ok) throw new Error("Network error");
+      const blob = await response.blob();
+      saveAs(blob, file.fileName || "download");
+    } catch (error) {
+      alert("Failed to download file. This is usually a CORS issue or the file is not public.");
+      console.error(error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const groupFilesByType = (files) => {
     const groups = {};
     files?.forEach(f => {
@@ -171,14 +187,23 @@ function FileItem({ file }) {
               <p className="text-sm text-gray-400 mb-2">{file?.fileType}</p>
               <p className="text-xs text-gray-500 mb-2">{(file?.fileSize / 1024 / 1024).toFixed(2)} MB</p>
             </div>
-            <button
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 font-semibold shadow"
-              onClick={() => window.open(file?.fileUrl)}
-              disabled={file?.password && !isPasswordCorrect}
-            >
-              <Download size={20} />
-              Download File
-            </button>
+            <div className="w-full flex flex-col sm:flex-row gap-3">
+              <button
+                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 font-semibold shadow"
+                onClick={handleSingleFileDownload}
+                disabled={downloading || (file?.password && !isPasswordCorrect)}
+              >
+                <Download size={20} />
+                {downloading ? "Downloading..." : "Download File"}
+              </button>
+              <button
+                className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 font-semibold shadow"
+                onClick={() => window.open(file?.fileUrl, "_blank")}
+                disabled={file?.password && !isPasswordCorrect}
+              >
+                Preview
+              </button>
+            </div>
           </div>
         )}
 

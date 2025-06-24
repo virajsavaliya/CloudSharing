@@ -212,7 +212,7 @@ export default function AdminDashboard() {
     };
 
     fetchStats();
-  }, []);
+  }, [activity]);
 
   // Top navigation with Lucide icons (gray)
   const navOptions = [

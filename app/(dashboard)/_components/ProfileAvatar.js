@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Image from "next/image";
 
 // Shared ProfileAvatar: Google photoURL if available, fallback to generated avatar, with broken image fallback
 const ProfileAvatar = ({ user, size = 40, className = "" }) => {
@@ -23,11 +24,12 @@ const ProfileAvatar = ({ user, size = 40, className = "" }) => {
   // Show Google photo if available and not errored, else fallback
   if (photoURL && !imgError) {
     return (
-      <img
+      <Image
         src={photoURL}
         alt={name}
         className={`rounded-full object-cover border-2 border-blue-400 bg-gray-100 shadow-md ${className}`}
-        style={{ width: size, height: size, minWidth: size, minHeight: size }}
+        width={size}
+        height={size}
         onError={() => setImgError(true)}
       />
     );

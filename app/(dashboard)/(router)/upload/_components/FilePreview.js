@@ -1,6 +1,7 @@
 import { X, CheckCircle } from "lucide-react";
 import React from "react";
 import { getFileIcon } from "../../../../_utils/fileIcons";
+import Image from "next/image";
 
 function FilePreview({ file, removeFile, uploaded }) {
   // Get icon based on file extension/type
@@ -9,7 +10,7 @@ function FilePreview({ file, removeFile, uploaded }) {
   return (
     <div className="flex items-center gap-2 justify-between mt-5 w-full border rounded-md p-2 border-blue-200">
       <div className="flex items-center p-2 gap-2">
-        <img
+        <Image
           src={getFileIcon(file.name || file.type)}
           alt="file icon"
           width={40}

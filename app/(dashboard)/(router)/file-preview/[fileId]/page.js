@@ -143,13 +143,13 @@ function FilePreview({ params }) {
         </nav>
       </div>
 
-      {/* ✅ Page Title */}
+      {/* Page Title */}
       <div className="text-center mb-8 mt-10">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">File Preview</h1>
         <hr className="border-b-2 border-gray-300 w-16 mx-auto" />
       </div>
 
-      {/* ✅ File & Share Section */}
+      {/* File & Share Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 mt-5">
         <FileInfo file={file} />
         <FileShareForm file={file} onPasswordSave={onPasswordSave} onReceiversAdd={onReceiversAdd} />

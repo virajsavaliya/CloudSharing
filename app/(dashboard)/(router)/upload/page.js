@@ -12,6 +12,8 @@ import {
 import { doc, getFirestore, setDoc, getDoc } from "firebase/firestore";
 import { generateRandomString } from "../../../_utils/GenerateRandomString";
 import { app } from "../../../../firebaseConfig";
+import Image from 'next/image'
+
 
 function Upload() {
   const pathname = usePathname();
@@ -182,7 +184,6 @@ function Upload() {
             router.push(`/login?redirect_url=${encodeURIComponent(pathname)}`)
           }
         >
-          Login
         </button>
       )}
     </div>
