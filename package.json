@@ -16,7 +16,7 @@
     "dotenv": "^16.4.5",
     "file-saver": "^2.0.5",
     "firebase": "^10.12.2",
-    "framer-motion": "^11.16.0",
+    "framer-motion": "^11.18.2",
     "jszip": "^3.10.1",
     "lru-cache": "^10.2.2",
     "lucide-react": "^0.380.0",
