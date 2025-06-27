@@ -1,12 +1,34 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { HeroWorkflow } from "./hero-workflow";
 import { FeaturesSection } from "./features-section";
 import UpgradePlans from './UpgradePlans';
 
 function Hero() {
+  const [showCookieConsent, setShowCookieConsent] = useState(false);
+
+  useEffect(() => {
+    // Check localStorage for cookie preference on load
+    const cookiePreference = localStorage.getItem('cookieConsent');
+    if (!cookiePreference) {
+      setShowCookieConsent(true); // Show consent bar if not yet set
+    }
+  }, []);
+
+  const handleAcceptCookies = () => {
+    localStorage.setItem('cookieConsent', 'accepted');
+    setShowCookieConsent(false);
+    document.cookie = "cookieConsent=accepted; max-age=31536000; path=/";
+  };
+
+  const handleDeclineCookies = () => {
+    localStorage.setItem('cookieConsent', 'declined');
+    setShowCookieConsent(false);
+    document.cookie = "cookieConsent=declined; max-age=31536000; path=/";
+  };
+
   return (
     <>
       <section className="relative w-full pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
@@ -35,8 +57,46 @@ function Hero() {
           </div>
         </div>
       </section>
+
       <FeaturesSection />
-<UpgradePlans />
+      <UpgradePlans />
+
+      {/* Footer */}
+      <div className="w-full bg-gray-50 border-t">
+        <div className="max-w-screen-xl mx-auto px-4 py-4 flex justify-center md:justify-end items-center gap-6 text-sm text-gray-600">
+          <a href="/terms" className="hover:text-gray-900">Terms & Conditions</a>
+          <span>•</span>
+          <a href="/privacy" className="hover:text-gray-900">Privacy Policy</a>
+        </div>
+      </div>
+
+      {/* Cookie Consent Bar */}
+      {showCookieConsent && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg z-50 p-4 md:p-6">
+          <div className="max-w-screen-xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-600">
+              <p>
+                We use cookies to enhance your experience. By continuing to visit this site you agree to our use of cookies.{' '}
+                <a href="/privacy" className="text-blue-600 hover:underline">Learn more</a>
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={handleDeclineCookies}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Decline
+              </button>
+              <button
+                onClick={handleAcceptCookies}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
