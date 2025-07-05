@@ -12,6 +12,7 @@
     "@fortawesome/fontawesome-svg-core": "^6.5.2",
     "@react-email/components": "^0.1.0",
     "@vercel/edge-config": "^1.1.1",
+    "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
     "file-saver": "^2.0.5",
