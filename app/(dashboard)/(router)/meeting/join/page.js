@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAuth } from "firebase/auth";
 import { app } from "../../../../../firebaseConfig"; // Updated relative path
 
-export default function MeetingJoinPage() {
+function MeetingJoinContent() {
   const params = useSearchParams();
   const room = params.get("room");
   // Try to get user info from params, fallback to Firebase Auth
@@ -74,5 +74,13 @@ export default function MeetingJoinPage() {
       <h1 className="text-2xl font-bold mb-4">Meeting Room</h1>
       <div ref={jitsiContainerRef} className="w-full max-w-5xl h-[600px]" />
     </div>
+  );
+}
+
+export default function MeetingJoinPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <MeetingJoinContent />
+    </Suspense>
   );
 }
