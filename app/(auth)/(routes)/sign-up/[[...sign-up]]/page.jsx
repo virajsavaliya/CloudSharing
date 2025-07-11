@@ -11,7 +11,7 @@ import {
   GoogleAuthProvider
 } from "firebase/auth";
 import { getFirestore, setDoc, doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { app } from "../../../../../firebaseConfig";
+import { app, sendVerificationEmail } from "../../../../../firebaseConfig";
 import { useRouter } from "next/navigation";
 
 export default function SignUpPage() {
@@ -21,6 +21,7 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [infoMsg, setInfoMsg] = useState("");
   const router = useRouter();
 
   const auth = getAuth(app);
@@ -29,6 +30,7 @@ export default function SignUpPage() {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
+    setInfoMsg("");
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -52,7 +54,13 @@ export default function SignUpPage() {
         email: user.email,
         timestamp: serverTimestamp(),
       });
-      router.push("/sign-in?redirect_url=/upload");
+      // Ensure user is up-to-date before sending verification
+      await user.reload();
+      // Send verification email
+      await sendVerificationEmail();
+      setInfoMsg("Verification email sent! Please check your inbox and verify your email before signing in.");
+      // Optionally, you can redirect after a delay or let user click sign-in after verifying
+      // router.push("/sign-in?redirect_url=/upload");
     } catch (err) {
       if (err.code === "auth/email-already-in-use") {
         setError(
@@ -152,6 +160,10 @@ export default function SignUpPage() {
           <div className="text-red-500 text-center mb-4 text-sm">
             {typeof error === "string" ? error : error}
           </div>
+        )}
+
+        {infoMsg && (
+          <div className="text-green-500 text-center mb-4 text-sm">{infoMsg}</div>
         )}
 
         <form onSubmit={handleSignup} className="flex flex-col gap-4">

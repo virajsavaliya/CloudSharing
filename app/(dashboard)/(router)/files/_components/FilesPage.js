@@ -65,7 +65,7 @@ function FilesPage() {
 
       await setDoc(doc(db, "recycleBin", file.id), {
         ...file,
-        removedAt: new Date(),
+        deletedAt: Date.now()
       });
 
       await deleteDoc(doc(db, collectionName, file.id));

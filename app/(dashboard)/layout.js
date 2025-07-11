@@ -26,7 +26,21 @@ function Layout({ children }) {
       <div className='h-full md:w-64 flex-col fixed inset-y-0 z-50 md:flex hidden'>
         <SideNav/>
       </div>
-      <div className='md:ml-64' style={{ flex: '1' }}>
+      <div
+        className='md:ml-64'
+        style={{
+          flex: '1',
+          paddingTop: '64px', // Add enough top padding for mobile header
+        }}
+      >
+        {/* On desktop, remove the padding */}
+        <style jsx>{`
+          @media (min-width: 768px) {
+            div[style*="padding-top"] {
+              padding-top: 0 !important;
+            }
+          }
+        `}</style>
         <TopHeader />
         {children}
       </div>

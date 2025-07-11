@@ -1,67 +1,76 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from "react";
-import { UploadCloud, Shield, Link as LinkIcon, Clock, Download, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { UploadCloud, Shield, Link as Clock, Download, ChevronLeft, ChevronRight, MessageSquare, Video } from "lucide-react";
+import { motion, useMotionValue, useAnimation } from "framer-motion";
 
 const features = [
   { icon: <UploadCloud className="w-10 h-10 text-primary" />, title: "Easy Uploads", description: "Drag and drop files to instantly create a shareable link." },
   { icon: <Shield className="w-10 h-10 text-primary" />, title: "Secure & Private", description: "Your files are encrypted and only accessible via a unique, secure link." },
-  { icon: <LinkIcon className="w-10 h-10 text-primary" />, title: "Shareable Links", description: "Generate a unique link for each file, making it easy to share anywhere." },
+  { icon: <MessageSquare className="w-10 h-10 text-primary" />, title: "Chat", description: "Connect instantly with users through real-time messaging." },
   { icon: <Clock className="w-10 h-10 text-primary" />, title: "Link Expiration", description: "For your security, all links automatically expire after 24 hours." },
   { icon: <Download className="w-10 h-10 text-primary" />, title: "Fast Downloads", description: "Recipients can download your files instantly with no sign-up required." },
-  { icon: <BarChart3 className="w-10 h-10 text-primary" />, title: "Download Tracking", description: "Keep track of how many times your shared files have been downloaded." },
+  { icon: <Video className="w-10 h-10 text-primary" />, title: "Meeting", description: "Host or join high-quality video meetings with ease." },
 ];
 
 const FeatureCard = ({ icon, title, description }) => (
-  <div className="min-w-[250px] md:min-w-[300px] w-[250px] md:w-[300px] flex-shrink-0 border rounded-lg p-6 shadow hover:shadow-lg transition-all bg-white snap-start">
-    <div className="bg-primary/10 rounded-lg p-3 w-fit mb-4 text-primary">{icon}</div>
-    <h3 className="font-bold text-xl mb-2">{title}</h3>
+  <div className="flex flex-col items-center justify-center w-[300px] h-[300px] bg-white rounded-2xl p-6 shadow-lg text-center mx-4">
+    <div className="bg-primary/10 p-4 rounded-xl mb-4">{icon}</div>
+    <h3 className="text-xl font-bold mb-2">{title}</h3>
     <p className="text-gray-600">{description}</p>
   </div>
 );
 
-const UpgradeCard = ({ title, description, buttonText, onClick }) => (
-  <div className="flex flex-col justify-between border rounded-lg p-6 shadow hover:shadow-lg transition-all bg-white text-center w-full max-w-sm mx-auto">
-    <div>
-      <h3 className="font-bold text-2xl mb-2">{title}</h3>
-      <p className="text-gray-600 mb-4">{description}</p>
-    </div>
-    <button
-      onClick={onClick}
-      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-full transition"
-    >
-      {buttonText}
-    </button>
-  </div>
-);
-
-
 export function FeaturesSection() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const sliderRef = useRef(null);
-  const extendedFeatures = [...features, ...features];
+  const [width, setWidth] = useState(0);
+  const carouselRef = useRef(null);
+  const x = useMotionValue(0);
+  const controls = useAnimation();
 
-  const goToNextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % extendedFeatures.length);
-  };
-
-  const goToPrevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + extendedFeatures.length) % extendedFeatures.length);
-  };
+  // Prepare duplicated slides for infinite loop
+  const slides = [features[features.length - 1], ...features, features[0]];
 
   useEffect(() => {
-    const slideTimer = setInterval(goToNextSlide, 3000);
-    return () => clearInterval(slideTimer);
-  }, [goToNextSlide]);
+    const updateWidth = () => {
+      if (carouselRef.current) {
+        setWidth(carouselRef.current.offsetWidth);
+      }
+    };
 
-  useEffect(() => {
-    if (sliderRef.current) {
-      const singleSlideWidth = 270;
-      const scrollPosition = currentSlide * singleSlideWidth;
-      sliderRef.current.scrollTo({ left: scrollPosition, behavior: 'smooth' });
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  const handleDragEnd = (_, info) => {
+    const distance = info.offset.x;
+
+    if (distance < -50) {
+      nextSlide();
+    } else if (distance > 50) {
+      prevSlide();
+    } else {
+      controls.start({ x: -width }); // Snap back if not enough swipe
     }
-  }, [currentSlide]);
+  };
+
+  const nextSlide = () => {
+    controls.start({
+      x: -width * 2,
+      transition: { duration: 0.4 },
+    }).then(() => {
+      controls.set({ x: -width });
+    });
+  };
+
+  const prevSlide = () => {
+    controls.start({
+      x: 0,
+      transition: { duration: 0.4 },
+    }).then(() => {
+      controls.set({ x: -width });
+    });
+  };
 
   return (
     <section id="features" className="w-full py-16 md:py-24 bg-secondary/50">
@@ -87,27 +96,40 @@ export function FeaturesSection() {
           </motion.p>
         </div>
 
-        <div className="relative flex items-center overflow-x-auto no-scrollbar">
-          <button onClick={goToPrevSlide} className="hidden md:flex absolute left-0 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100">
+        <div
+          ref={carouselRef}
+          className="relative flex items-center justify-center overflow-hidden group"
+        >
+          {/* Arrows */}
+          <button
+            onClick={prevSlide}
+            className="absolute left-4 md:left-2 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100 flex"
+          >
             <ChevronLeft className="w-6 h-6" />
           </button>
 
-          <div
-            ref={sliderRef}
-            className="flex gap-6 px-2 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory"
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: -width * 2, right: 0 }}
+            onDragEnd={handleDragEnd}
+            animate={controls}
+            initial={{ x: -width }}
+            className="flex cursor-grab"
+            style={{ x }}
           >
-            {extendedFeatures.map((feature, index) => (
+            {slides.map((feature, index) => (
               <FeatureCard key={index} {...feature} />
             ))}
-          </div>
+          </motion.div>
 
-          <button onClick={goToNextSlide} className="hidden md:flex absolute right-0 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100">
+          <button
+            onClick={nextSlide}
+            className="absolute right-4 md:right-2 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100 flex"
+          >
             <ChevronRight className="w-6 h-6" />
           </button>
         </div>
       </div>
-
-      
     </section>
   );
 }

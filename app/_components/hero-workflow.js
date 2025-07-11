@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { UploadCloud, Shield, Link as LinkIcon, Clock, Download, BarChart3, Share2 } from "lucide-react";
+import { UploadCloud, Shield, Link as LinkIcon, Download, Share2 } from "lucide-react";
+import { MessageSquare, Video } from 'lucide-react';
 
 const Feature = ({ icon, title, description, alignment = 'left' }) => (
   <div className={`flex items-start gap-4 ${alignment === 'right' ? 'flex-row-reverse text-right' : 'text-left'}`}>
@@ -19,13 +20,12 @@ export function HeroWorkflow() {
   const leftFeatures = [
     { icon: <UploadCloud className="w-6 h-6" />, title: "Easy Uploads", description: "Drag & drop files to instantly create a shareable link." },
     { icon: <Shield className="w-6 h-6" />, title: "Secure & Private", description: "Files are encrypted and accessible only via a unique link." },
-    { icon: <Clock className="w-6 h-6" />, title: "Link Expiration", description: "For security, all links automatically expire after 24 hours." },
-  ];
+    { icon: <MessageSquare className="w-6 h-6" />, title: "Chat", description: "Connect with others instantly using our built-in chat feature." },];
 
   const rightFeatures = [
     { icon: <LinkIcon className="w-6 h-6" />, title: "Shareable Links", description: "Generate a unique link for each file to share anywhere." },
     { icon: <Download className="w-6 h-6" />, title: "Fast Downloads", description: "Recipients download files instantly, no sign-up needed." },
-    { icon: <BarChart3 className="w-6 h-6" />, title: "Download Tracking", description: "See how many times your shared files have been downloaded." },
+    { icon: <Video className="w-6 h-6" />, title: "Meeting", description: "Host or join video meetings with high-quality streaming." },
   ];
 
   return (

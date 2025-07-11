@@ -1,4 +1,4 @@
-import { File, Home, LucideHelpCircle, Shield, Trash2, Upload, Settings } from "lucide-react";
+import { File, Home, LucideHelpCircle, Shield, Trash2, Upload, Settings, Video, MessageSquare } from "lucide-react";
 import Image from "next/image";
 import React, { useMemo, useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -58,7 +58,7 @@ const saveUserToFirebase = async (user) => {
   }
 };
 
-function SideNav() {
+function SideNav({ unreadChatCount = 0 }) {
   // Use Firebase Auth for user
   const { user, logout } = useAuth();
   const pathname = usePathname();
@@ -107,9 +107,10 @@ function SideNav() {
       { id: 1, name: "Home", icon: Home, path: "/" },
       { id: 2, name: "Files", icon: File, path: "/files" },
       { id: 3, name: "Upload", icon: Upload, path: "/upload" },
-      // Remove Upgrade for admin
-      ...(userRole === "admin" ? [] : [{ id: 4, name: "Upgrade", icon: Shield, path: "/upgrade" }]),
+      { id: 8, name: "Meeting", icon: Video, path: "/meeting" },
+      { id: 9, name: "Chat", icon: MessageSquare, path: "/chat" }, // Chat menu
       { id: 5, name: "Recycle Bin", icon: Trash2, path: "/recycle" },
+      ...(userRole === "admin" ? [] : [{ id: 4, name: "Upgrade", icon: Shield, path: "/upgrade" }]),
       { id: 6, name: "Help", icon: LucideHelpCircle, path: "/help" },
     ];
     if (userRole === "admin") {
@@ -252,10 +253,23 @@ function SideNav() {
                 }`}
               onClick={() => handleNavigation(item.path)}
             >
-              <div className={`border border-transparent rounded-full p-1 ${pathname === item.path ? "border-blue-500" : ""}`}>
+              <div className={`border border-transparent rounded-full p-1 ${pathname === item.path ? "border-blue-500" : ""
+                } relative`}>
                 <item.icon className="menu-icon" />
+                {item.name === "Chat" && unreadChatCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 shadow">
+                    {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                  </span>
+                )}
               </div>
-              <h2 className="font-medium">{item.name}</h2>
+              <h2 className="font-medium flex items-center gap-1">
+                {item.name}
+                {(item.name === "Meeting" || item.name === "Chat") && (
+                  <span className="text-[10px] font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    Beta
+                  </span>
+                )}
+              </h2>
             </button>
           ))}
         </div>

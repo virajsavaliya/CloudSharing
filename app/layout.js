@@ -5,7 +5,6 @@ import { ToastContainer } from 'react-toastify';
 import ChatBot from './_components/ChatBot';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from "./_utils/FirebaseAuthContext";
-import { SpeedInsights } from "@vercel/speed-insights/next"
 
 // Load the fonts
 const inter = Inter({ subsets: ["latin"] });
@@ -32,7 +31,6 @@ export default function RootLayout({ children }) {
           <meta name="theme-color" content="#2563eb" />
         </head>
         <body className={inter.className}>
-          <SpeedInsights/>
           <AuthProvider>
             {children}
             <ChatBot />

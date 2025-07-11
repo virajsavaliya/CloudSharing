@@ -9,7 +9,9 @@ import {
   Folder as FolderIcon,
   HelpCircle as HelpIcon,
   Shield,
-  Settings
+  Settings,
+  Video as VideoIcon, // Add Video icon for Meeting
+  MessageSquare as ChatIcon // Add Chat icon for Chat
 } from "lucide-react";
 import { useAuth } from "../../_utils/FirebaseAuthContext";
 import ProfileAvatar from "./ProfileAvatar";
@@ -89,6 +91,16 @@ function TopHeader() {
       icon: <UploadIcon className="w-7 h-7 text-gray-500" />,
     },
     {
+      name: "Meeting",
+      href: "/meeting",
+      icon: <VideoIcon className="w-7 h-7 text-gray-500" />, // Use video icon for Meeting
+    },
+    {
+      name: "Chat",
+      href: "/chat",
+      icon: <ChatIcon className="w-7 h-7 text-gray-500" />, // Use chat icon for Chat
+    },
+    {
       name: "Upgrade",
       href: "/upgrade",
       icon: <Shield className="w-7 h-7 text-gray-500" />,
@@ -99,17 +111,17 @@ function TopHeader() {
       href: "/recycle",
       icon: <TrashIcon className="w-7 h-7 text-gray-500" />,
     },
-    {
-      name: "Help",
-      href: "/help",
-      icon: <HelpIcon className="w-7 h-7 text-gray-500" />,
-    },
-    {
+     {
       name: "Admin Panel",
       href: "/admin",
       icon: <Settings className="w-7 h-7 text-gray-500" />,
       show: userRole === "admin",
     },
+    {
+      name: "Help",
+      href: "/help",
+      icon: <HelpIcon className="w-7 h-7 text-gray-500" />,
+    }    
   ];
 
   // Profile picture upload handler
@@ -194,15 +206,20 @@ function TopHeader() {
           <span />
           <span />
         </button>
-        <div className="flex-1 flex justify-center">
+        <div className="flex-1 flex justify-center items-center gap-2">
           <Image src="/logo.svg" width={120} height={40} alt="Logo" />
+          <span className="text-xs bg-yellow-400 text-yellow-900 font-semibold px-2 py-0.5 rounded-full shadow-sm">
+            Beta
+          </span>
         </div>
+
         <div className="relative">
           <button onClick={toggleProfileMenu} className="focus:outline-none">
             {user ? (
               <ProfileAvatar user={user} size={40} />
             ) : null}
           </button>
+
         </div>
       </div>
 
@@ -296,7 +313,16 @@ function TopHeader() {
                       <Link href={item.href} className="menu-link" onClick={closeMenu}>
                         <div className="flex items-center w-full h-full gap-4 px-4 py-3">
                           {item.icon}
-                          <span className="text-lg">{item.name}</span>
+                          <span className="text-lg flex items-center gap-1">
+                            {item.name}
+                            {(item.name === "Chat" || item.name === "Meeting") && (
+                              <span className="text-[10px] bg-yellow-400 text-yellow-900 font-bold px-2 py-0.5 rounded-full ml-1">
+                                Beta
+                              </span>
+                            )}
+                          </span>
+
+
                         </div>
                       </Link>
                     </li>
@@ -484,7 +510,7 @@ function TopHeader() {
                 </div>
               </div>
               {/* Logout Button */}
-              
+
             </div>
           </div>
         </div>

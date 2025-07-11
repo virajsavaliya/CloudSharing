@@ -25,7 +25,8 @@ function MyApp({ Component, pageProps }) {
       "/files",
       "/upload",
       "/recycle",
-      "/admin"
+      "/admin",
+      "/meeting" // <-- Add meeting to protected routes
     ];
     const auth = getAuth();
     let unsub = onAuthStateChanged(auth, (user) => {

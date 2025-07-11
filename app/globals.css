@@ -506,3 +506,9 @@ button:hover {
   margin-top: 8px;
   text-align: center;
 }
+
+@media (max-width: 767px) {
+  .pt-mobile-header {
+    padding-top: 64px !important;
+  }
+}
