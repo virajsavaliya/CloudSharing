@@ -1,8 +1,8 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { getAnalytics } from "firebase/analytics";
+import { getFirestore, collection, query, where, getDocs, deleteDoc, Timestamp, onSnapshot, doc, setDoc } from "firebase/firestore";
 import { getStorage, ref, deleteObject } from "firebase/storage";
-import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -23,20 +23,12 @@ export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-/**
- * Custom event emitter for file-related events.
- */
+// Create custom event emitter
 class FileEventEmitter {
     constructor() {
-        /** @type {Object<string, Function[]>} */
         this.events = {};
     }
 
-    /**
-     * Add an event listener for a specific event.
-     * @param {string} event
-     * @param {Function} callback
-     */
     addEventListener(event, callback) {
         if (!this.events[event]) {
             this.events[event] = [];
@@ -44,42 +36,25 @@ class FileEventEmitter {
         this.events[event].push(callback);
     }
 
-    /**
-     * Remove an event listener for a specific event.
-     * @param {string} event
-     * @param {Function} callback
-     */
     removeEventListener(event, callback) {
         if (!this.events[event]) return;
         this.events[event] = this.events[event].filter(cb => cb !== callback);
     }
 
-    /**
-     * Emit an event to all listeners.
-     * @param {string} event
-     * @param {any} data
-     */
     emit(event, data) {
         if (!this.events[event]) return;
-        // Use setTimeout for smoother UI updates
-        this.events[event].forEach(callback => setTimeout(() => callback(data), 0));
+        this.events[event].forEach(callback => callback(data));
     }
 }
 
 export const fileEvents = new FileEventEmitter();
 
-/**
- * Move a file to the recycle bin.
- * @param {Object} fileData
- * @param {string} fileId
- * @returns {Promise<boolean>}
- */
+// Helper function to move file to recycle bin
 export const moveToRecycleBin = async (fileData, fileId) => {
     try {
         await setDoc(doc(db, 'recycleBin', fileId), {
             ...fileData,
-            originalLocation: 'uploadedFile',
-            deletedAt: new Date().toISOString()
+            originalLocation: 'uploadedFile'
         });
         await deleteDoc(doc(db, 'uploadedFile', fileId));
         console.log('File moved to recycle bin:', fileId);
@@ -90,20 +65,21 @@ export const moveToRecycleBin = async (fileData, fileId) => {
     }
 };
 
-/**
- * Delete all user data from all collections.
- * @param {string} userId
- * @param {string} userEmail
- * @returns {Promise<void>}
- */
+// Delete all user data from all collections (call this on account deletion)
 export const deleteAllUserData = async (userId, userEmail) => {
     try {
+        // Delete user doc
         await deleteDoc(doc(db, "users", userId));
+        // Delete userRoles doc
         await deleteDoc(doc(db, "userRoles", userId));
+        // Delete userSubscriptions doc
         await deleteDoc(doc(db, "userSubscriptions", userId));
+        // Delete emailSubscriptions doc
         if (userEmail) {
             await deleteDoc(doc(db, "emailSubscriptions", userEmail));
-            // Delete all uploadedFile docs and their storage files
+        }
+        // Delete all uploadedFile docs and their storage files
+        if (userEmail) {
             const filesSnap = await getDocs(query(collection(db, "uploadedFile"), where("userEmail", "==", userEmail)));
             for (const file of filesSnap.docs) {
                 const data = file.data();
@@ -111,9 +87,7 @@ export const deleteAllUserData = async (userId, userEmail) => {
                     try {
                         const storageRef = ref(storage, data.fileUrl);
                         await deleteObject(storageRef);
-                    } catch (e) {
-                        console.warn("Storage file deletion failed:", e);
-                    }
+                    } catch (e) {}
                 }
                 await deleteDoc(file.ref);
             }
@@ -127,9 +101,7 @@ export const deleteAllUserData = async (userId, userEmail) => {
                             try {
                                 const storageRef = ref(storage, f.fileUrl);
                                 await deleteObject(storageRef);
-                            } catch (e) {
-                                console.warn("Storage file deletion failed:", e);
-                            }
+                            } catch (e) {}
                         }
                     }
                 }
@@ -143,65 +115,14 @@ export const deleteAllUserData = async (userId, userEmail) => {
                     try {
                         const storageRef = ref(storage, data.fileUrl);
                         await deleteObject(storageRef);
-                    } catch (e) {
-                        console.warn("Storage file deletion failed:", e);
-                    }
+                    } catch (e) {}
                 }
                 await deleteDoc(rec.ref);
             }
         }
+        // Optionally: delete other user-related collections here
         console.log("All user data deleted for:", userId, userEmail);
     } catch (err) {
         console.error("Error deleting all user data from Firestore:", err);
-        throw err;
     }
 };
-
-/**
- * Send email verification to the current user.
- * @returns {Promise<boolean>}
- */
-export const sendVerificationEmail = async () => {
-    const auth = getAuth(app);
-    if (auth.currentUser) {
-        try {
-            await sendEmailVerification(auth.currentUser);
-            return true;
-        } catch (error) {
-            console.error("Error sending verification email:", error);
-            return false;
-        }
-    }
-    return false;
-};
-
-/**
- * Send password reset email.
- * @param {string} email
- * @returns {Promise<boolean>}
- */
-export const sendResetPasswordEmail = async (email) => {
-    const auth = getAuth(app);
-    try {
-        await sendPasswordResetEmail(auth, email);
-        return true;
-    } catch (error) {
-        console.error("Error sending password reset email:", error);
-        throw error;
-    }
-};
-
-/**
- * Delete a user from Firebase Authentication (requires Admin SDK, server-side).
- * @param {string} uid
- * @returns {Promise<void>}
- */
-// This function is for reference. You must call this from a server-side API route using Firebase Admin SDK.
-export const deleteUserFromAuth = async (uid) => {
-    // This code must run on your server (Node.js) with Firebase Admin SDK:
-    // const admin = require("firebase-admin");
-    // await admin.auth().deleteUser(uid);
-    // For client-side, you cannot delete other users from Auth.
-    throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
-};
-

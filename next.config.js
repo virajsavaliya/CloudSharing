@@ -13,7 +13,7 @@ const nextConfig = {
   devIndicators: {
     autoPrerender: false,
   },
-  productionBrowserSourceMaps: true,
+  productionBrowserSourceMaps: false,
   async headers() {
     return [
       {
