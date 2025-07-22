@@ -1,8 +1,12 @@
-export default function Toast({ toast }) {
-  if (!toast) return null;
+import React from 'react';
+
+const Toast = ({ message }) => {
+  if (!message) return null;
   return (
-    <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-2 rounded shadow-lg z-50 animate-fadeIn" role="alert">
-      {toast}
+    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-[100]" role="alert">
+      {message}
     </div>
   );
-}
+};
+
+export default Toast;

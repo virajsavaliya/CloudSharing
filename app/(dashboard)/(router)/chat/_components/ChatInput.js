@@ -1,51 +1,52 @@
-import { Smile, Send } from "lucide-react";
-import EmojiPicker from "emoji-picker-react";
+import React from 'react';
+import { Smile, Paperclip, Send } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 
-export default function ChatInput({ selectedUser, input, setInput, sendMessage, showEmojiPicker, setShowEmojiPicker, inputRef }) {
-  if (!selectedUser) return null;
+const ChatInput = ({ selectedUser, input, setInput, sendMessage, showEmojiPicker, setShowEmojiPicker, inputRef }) => {
+
+  const handleSend = () => {
+    if (input.trim()) {
+      sendMessage();
+    }
+  };
+
+  const onEmojiClick = (emojiObject) => {
+    setInput(prevInput => prevInput + emojiObject.emoji);
+    inputRef.current?.focus();
+  };
+
+  if (!selectedUser) {
+    return (
+        <div className="p-4 text-center text-sm text-gray-400 bg-gray-100 rounded-full">
+            Select a chat to start messaging
+        </div>
+    );
+  }
+
   return (
-    <footer className="px-4 py-4 border-t bg-white/90 backdrop-blur-md flex gap-2 items-center sticky bottom-0 z-20" aria-label="Chat Input">
-      <div className="relative">
-        <button
-          type="button"
-          className="px-2 py-1 rounded hover:bg-gray-100"
-          onClick={() => setShowEmojiPicker((prev) => !prev)}
-          title="Insert emoji"
-          aria-label="Insert emoji"
-        >
-          <Smile className="w-7 h-7 text-gray-400" />
+    <div className="relative">
+      {showEmojiPicker && (
+        <div className="absolute bottom-16 z-10">
+          <EmojiPicker onEmojiClick={onEmojiCick} />
+        </div>
+      )}
+      <div className="flex items-center gap-3 bg-white rounded-full p-2 shadow-sm border">
+         <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Smile /></button>
+         <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Paperclip /></button>
+        <input
+          ref={inputRef}
+          className="flex-1 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type a message..."
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+        />
+        <button onClick={handleSend} className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transition-all" aria-label="Send message">
+          <Send className="w-5 h-5" />
         </button>
-        {showEmojiPicker && (
-          <div className="absolute bottom-12 left-0 z-50">
-            <EmojiPicker
-              onEmojiClick={(emojiObject) => {
-                setInput((prev) => prev + emojiObject.emoji);
-                setShowEmojiPicker(false);
-                inputRef.current && inputRef.current.focus();
-              }}
-              theme="light"
-            />
-          </div>
-        )}
       </div>
-      <input
-        ref={inputRef}
-        className="flex-1 border border-gray-200 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Type a message..."
-        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-        aria-label="Type a message"
-      />
-      <button
-        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full shadow transition flex items-center gap-2"
-        onClick={sendMessage}
-        aria-label="Send message"
-        title="Send"
-      >
-        <Send className="w-5 h-5" />
-        <span className="hidden md:inline">Send</span>
-      </button>
-    </footer>
+    </div>
   );
-}
+};
+
+export default ChatInput;

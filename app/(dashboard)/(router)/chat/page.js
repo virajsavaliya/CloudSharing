@@ -16,7 +16,7 @@ import Toast from "./_components/Toast";
 // Ensure user has a unique chatId in Firestore
 async function ensureChatId(user) {
   if (!user) return null;
-  const userRef = doc(db, "users", user.uid);
+  const userRef = doc(db, "users", user.uid); // <-- use user.uid
   let userSnap = await getDoc(userRef);
   let data = userSnap.exists() ? userSnap.data() : {};
   if (data.chatId) {
@@ -35,7 +35,7 @@ async function ensureChatId(user) {
 }
 
 // Memoized UserAvatar for performance
-const UserAvatar = memo(({ user, size = 40, fallbackBg = "bg-blue-100", fallbackTextColor = "text-blue-700", fallback = "U" }) => {
+const UserAvatar = memo(function UserAvatar({ user, size = 40, fallbackBg = "bg-blue-100", fallbackTextColor = "text-blue-700", fallback = "U" }) {
   if (user?.photoURL) {
     return (
       <Image
@@ -204,11 +204,21 @@ function ChatPage() {
   // Send message: write to Firestore
   const sendMessage = async () => {
     if (!input.trim() || !selectedUser) return;
+    // Get sender info (including photoURL)
+    let senderInfo = user;
+    if (!senderInfo || !senderInfo.displayName || !senderInfo.photoURL) {
+      const senderDoc = await getDoc(doc(db, "users", user.uid));
+      if (senderDoc.exists()) {
+        senderInfo = { ...senderDoc.data(), ...senderInfo };
+      }
+    }
     const msg = {
       senderId: chatId,
       receiverId: selectedUser.chatId,
       message: input,
       timestamp: new Date().toISOString(),
+      senderPhotoURL: senderInfo.photoURL || null, // <-- add this line
+      senderDisplayName: senderInfo.displayName || senderInfo.email || "", // optional
     };
     setInput("");
     // Write to Firestore
@@ -219,7 +229,7 @@ function ChatPage() {
 
     // --- Add receiver to sender's chatHistory in Firestore if not present ---
     try {
-      const userRef = doc(db, "users", chatId);
+      const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -238,40 +248,9 @@ function ChatPage() {
         }
       }
     } catch (e) {
-      // ignore error, not critical for sending message
+      // ignore error
     }
 
-    // --- Add sender to receiver's chatHistory if not present ---
-    try {
-      const receiverRef = doc(db, "users", selectedUser.chatId);
-      const receiverSnap = await getDoc(receiverRef);
-      if (receiverSnap.exists()) {
-        const receiverData = receiverSnap.data();
-        const receiverChatHistory = receiverData.chatHistory || [];
-        const senderExists = receiverChatHistory.some(u => u.chatId === chatId);
-        if (!senderExists) {
-          // Get sender info from Firestore for accurate displayName/photoURL
-          let senderInfo = user;
-          if (!senderInfo || !senderInfo.displayName || !senderInfo.photoURL) {
-            const senderDoc = await getDoc(doc(db, "users", chatId));
-            if (senderDoc.exists()) {
-              senderInfo = { ...senderDoc.data(), ...senderInfo };
-            }
-          }
-          const senderEntry = {
-            chatId: chatId,
-            displayName: senderInfo.displayName || senderInfo.email || "",
-            email: senderInfo.email || "",
-            photoURL: senderInfo.photoURL || null,
-          };
-          await updateDoc(receiverRef, {
-            chatHistory: arrayUnion(senderEntry)
-          });
-        }
-      }
-    } catch (e) {
-      // ignore error, not critical for sending message
-    }
     // No need to manually fetch messages, listener will update
   };
 
@@ -299,6 +278,7 @@ function ChatPage() {
 
   // Helper to get latest user info from Firestore by chatId
   const getUserByChatId = async (chatId) => {
+    // Find user by chatId field, not document ID
     const snap = await getDocs(collection(db, "users"));
     return snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
@@ -335,6 +315,14 @@ function ChatPage() {
 
     chatHistory.forEach((chat) => {
       if (!chat.chatId) return;
+
+      if (selectedUser?.chatId === chat.chatId) {
+        if (unreadCounts[chat.chatId] !== 0) {
+            setUnreadCounts(prev => ({ ...prev, [chat.chatId]: 0 }));
+        }
+        return;
+      }
+
       const chatKey = [chatId, chat.chatId].sort().join("_");
       const messagesRef = collection(db, "chats", chatKey, "messages");
       const lastReadRef = doc(db, "chats", chatKey, "lastRead", chatId);
@@ -366,7 +354,7 @@ function ChatPage() {
       unsubscribes.forEach(unsub => unsub && unsub());
     };
     // eslint-disable-next-line
-  }, [chatId, chatHistory]);
+  }, [chatId, chatHistory, selectedUser]);
 
   // --- Mark messages as read when opening a chat (update Firestore) ---
   useEffect(() => {
@@ -644,6 +632,7 @@ function ChatPage() {
         setOtherId={setOtherId}
         handleConnectById={handleConnectById}
         idError={idError}
+        setIdError={setIdError} // <-- add this line
       />
       {/* Modern style tweaks */}
       <style jsx>{`

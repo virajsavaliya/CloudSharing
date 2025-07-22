@@ -1,13 +1,15 @@
 "use client";
-import { Suspense, useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getAuth } from "firebase/auth";
 import { app } from "../../../../../firebaseConfig"; // Updated relative path
 
-function MeetingJoinContent() {
+// This component contains the actual page logic.
+// By extracting it, we can wrap it in <Suspense> in the main export.
+function MeetingPageContent() {
   const params = useSearchParams();
   const room = params.get("room");
-  // Try to get user info from params, fallback to Firebase Auth
+
   const auth = getAuth(app);
   const currentUser = auth.currentUser;
   const email = params.get("email") || currentUser?.email || "";
@@ -18,31 +20,36 @@ function MeetingJoinContent() {
   const jitsiContainerRef = useRef(null);
 
   useEffect(() => {
-    if (room && name && jitsiContainerRef.current) {
+    // FIX: Store the ref's current value in a variable inside the effect.
+    const container = jitsiContainerRef.current;
+
+    if (room && name && container) {
       const scriptId = "jitsi-api";
+      // Ensure Jitsi script is loaded before creating the meeting
       if (!document.getElementById(scriptId)) {
         const script = document.createElement("script");
         script.id = scriptId;
         script.src = "https://meet.jit.si/external_api.js";
         script.async = true;
-        script.onload = () => {
-          createJitsi();
-        };
+        script.onload = () => createJitsi(container);
         document.body.appendChild(script);
       } else {
-        createJitsi();
+        createJitsi(container);
       }
     }
 
-    function createJitsi() {
-      if (!window.JitsiMeetExternalAPI) return;
-      jitsiContainerRef.current.innerHTML = "";
+    function createJitsi(jitsiNode) {
+      if (!window.JitsiMeetExternalAPI || !jitsiNode) return;
+      
+      // Clear any previous instance
+      jitsiNode.innerHTML = "";
+
       const domain = "meet.jit.si";
       const options = {
         roomName: room,
         width: "100%",
         height: 600,
-        parentNode: jitsiContainerRef.current,
+        parentNode: jitsiNode,
         userInfo: { displayName: name, email: email || undefined },
         configOverwrite: {
           prejoinPageEnabled: false,
@@ -50,13 +57,15 @@ function MeetingJoinContent() {
         interfaceConfigOverwrite: {
           HIDE_INVITE_MORE_HEADER: true,
         },
-        // jwt: "YOUR_JWT_TOKEN", // For self-hosted Jitsi with JWT auth
       };
       new window.JitsiMeetExternalAPI(domain, options);
     }
+
+    // FIX: Use the local variable in the cleanup function.
+    // This prevents the "exhaustive-deps" warning for the ref.
     return () => {
-      if (jitsiContainerRef.current) {
-        jitsiContainerRef.current.innerHTML = "";
+      if (container) {
+        container.innerHTML = "";
       }
     };
   }, [room, name, email]);
@@ -65,22 +74,26 @@ function MeetingJoinContent() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="text-lg font-semibold mb-2">Invalid meeting link.</div>
+        <div className="text-sm text-gray-500">Please check the URL and try again.</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <h1 className="text-2xl font-bold mb-4">Meeting Room</h1>
-      <div ref={jitsiContainerRef} className="w-full max-w-5xl h-[600px]" />
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+      <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Meeting Room: {room}</h1>
+      <div ref={jitsiContainerRef} className="w-full max-w-5xl h-[600px] rounded-lg shadow-lg overflow-hidden" />
     </div>
   );
 }
 
+// Main page export
 export default function MeetingJoinPage() {
+  // FIX: Wrap the component that uses `useSearchParams` in a <Suspense> boundary.
+  // This tells Next.js to wait for the client-side rendering of this part.
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-      <MeetingJoinContent />
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading Meeting...</div>}>
+      <MeetingPageContent />
     </Suspense>
   );
 }

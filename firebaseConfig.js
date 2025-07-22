@@ -190,3 +190,18 @@ export const sendResetPasswordEmail = async (email) => {
         throw error;
     }
 };
+
+/**
+ * Delete a user from Firebase Authentication (requires Admin SDK, server-side).
+ * @param {string} uid
+ * @returns {Promise<void>}
+ */
+// This function is for reference. You must call this from a server-side API route using Firebase Admin SDK.
+export const deleteUserFromAuth = async (uid) => {
+    // This code must run on your server (Node.js) with Firebase Admin SDK:
+    // const admin = require("firebase-admin");
+    // await admin.auth().deleteUser(uid);
+    // For client-side, you cannot delete other users from Auth.
+    throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
+};
+

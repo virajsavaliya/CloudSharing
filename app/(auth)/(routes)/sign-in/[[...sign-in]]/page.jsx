@@ -300,8 +300,21 @@ export default function SignInPage() {
                 <div className="mt-3 text-sm text-center text-gray-700">{forgotMsg}</div>
               )}
               {forgotError && (
-                <div className="mt-2 text-xs text-center text-red-500">{forgotError}</div>
+                <div className="mt-2 text-xs text-center text-red-500">
+                  {forgotError}
+                  <br />
+                  <span>
+                    If you see "auth/too-many-requests", wait a few minutes and try again.<br />
+                    If "auth/user-not-found", check your email address.
+                  </span>
+                </div>
               )}
+              <div className="mt-2 text-xs text-gray-500 text-center">
+                If you don't receive the email, check your spam folder.<br />
+                Make sure your sender email is verified in Firebase Console.<br />
+                If you still have issues, contact support at <b>cloudsharing.fileshare@gmail.com</b>.<br />
+                <span style={{color: "#d00"}}>If you are testing with Gmail, sometimes Google delays or blocks emails. Try with a different email provider if possible.</span>
+              </div>
             </div>
           </div>
         )}

@@ -41,51 +41,51 @@ export function EmailTemplate({ response }) {
   const shortenFileType = (fileType) => {
     const fileTypeMap = {
       "image/jpeg": ".jpeg",
-        "image/png": ".png",
-        "image/svg+xml": ".svg",
-        "image/gif": ".gif",
-        "image/heic": ".heic",
-        "image/heif": ".heif",
-        "image/dng": ".dng",
-        "application/pdf": ".pdf",
-        "application/zip": ".zip",
-        "application/x-rar-compressed": ".rar",
-        "application/x-7z-compressed": ".7z",
-        "application/x-tar": ".tar",
-        "application/x-gzip": ".gz",
-        "application/x-zip-compressed": ".zip",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-          ".docx",
-        "application/msword": ".doc",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-          ".xlsx",
-        "application/vnd.ms-excel": ".xls",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-          ".pptx",
-        "application/vnd.ms-powerpoint": ".ppt",
-        "application/msaccess": ".accdb",
-        "application/vnd.ms-project": ".mpp",
-        "application/vnd.visio": ".vsdx",
-        "video/mp4": ".mp4",
-        "video/x-msvideo": ".avi",
-        "video/x-ms-wmv": ".wmv",
-        "video/x-matroska": ".mkv",
-        "video/webm": ".webm",
-        "video/quicktime": ".mov",
-        "video/mpeg": ".mpeg",
-        "video/ogg": ".ogv",
-        "video/3gpp": ".3gp",
-        "video/3gpp2": ".3g2",
-        "video/x-flv": ".flv",
-        "video/x-m4v": ".m4v",
-        "audio/mpeg": ".mp3",
-        "audio/wav": ".wav",
-        "audio/ogg": ".ogg",
-        "audio/flac": ".flac",
-        "audio/aac": ".aac",
-        "audio/mp4": ".m4a",
-        "audio/amr": ".amr",
-        "audio/x-ms-wma": ".wma",
+      "image/png": ".png",
+      "image/svg+xml": ".svg",
+      "image/gif": ".gif",
+      "image/heic": ".heic",
+      "image/heif": ".heif",
+      "image/dng": ".dng",
+      "application/pdf": ".pdf",
+      "application/zip": ".zip",
+      "application/x-rar-compressed": ".rar",
+      "application/x-7z-compressed": ".7z",
+      "application/x-tar": ".tar",
+      "application/x-gzip": ".gz",
+      "application/x-zip-compressed": ".zip",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        ".docx",
+      "application/msword": ".doc",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        ".xlsx",
+      "application/vnd.ms-excel": ".xls",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        ".pptx",
+      "application/vnd.ms-powerpoint": ".ppt",
+      "application/msaccess": ".accdb",
+      "application/vnd.ms-project": ".mpp",
+      "application/vnd.visio": ".vsdx",
+      "video/mp4": ".mp4",
+      "video/x-msvideo": ".avi",
+      "video/x-ms-wmv": ".wmv",
+      "video/x-matroska": ".mkv",
+      "video/webm": ".webm",
+      "video/quicktime": ".mov",
+      "video/mpeg": ".mpeg",
+      "video/ogg": ".ogv",
+      "video/3gpp": ".3gp",
+      "video/3gpp2": ".3g2",
+      "video/x-flv": ".flv",
+      "video/x-m4v": ".m4v",
+      "audio/mpeg": ".mp3",
+      "audio/wav": ".wav",
+      "audio/ogg": ".ogg",
+      "audio/flac": ".flac",
+      "audio/aac": ".aac",
+      "audio/mp4": ".m4a",
+      "audio/amr": ".amr",
+      "audio/x-ms-wma": ".wma",
     };
     return fileTypeMap[fileType] || fileType || 'File';
   };
@@ -219,9 +219,9 @@ export function EmailTemplate({ response }) {
               <div class="contained-files">
                 <span class="label">Contains:</span>
                 <ul style="margin-top: 5px; margin-bottom: 0;">
-                  ${response.files.map(file => `
-                    <li>${truncateFileName(file.name)} (${(file.size / (1024 * 1024)).toFixed(2)} MB)</li>
-                  `).join('')}
+                    ${response.files.map(file => `
+                        <li>${truncateFileName(file.name)} (${(file.size / (1024 * 1024)).toFixed(2)} MB)</li>
+                    `).join('')}
                 </ul>
               </div>` : ''}
             </div>

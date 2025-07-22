@@ -13,7 +13,7 @@ function FileInfo({ file }) {
 
   return file && (
     <div className='text-center border flex justify-center m-5 flex-col items-center p-4 rounded-md border-gray-300'>
-      
+
       {/* ✅ QR Code for file/folder short URL */}
       {file.shortUrl && (
         <div className='bg-white p-3 rounded-lg shadow-md mb-4'>
@@ -37,7 +37,7 @@ function FileInfo({ file }) {
       {/* ✅ File/Folder Info */}
       <div className='flex flex-col items-center gap-2 w-full max-w-sm'>
         <h2 className='overflow-hidden text-ellipsis whitespace-nowrap font-medium w-full text-center'>
-          {file.fileName || "Untitled"}
+          {file.fileName || file.name || file.folderName || "Untitled"}
         </h2>
         <div className='text-gray-400 text-[13px] space-y-1'>
           <h2>{fileType}</h2>

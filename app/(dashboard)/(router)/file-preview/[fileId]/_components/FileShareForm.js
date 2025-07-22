@@ -16,13 +16,19 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleAddEmail = (e) => {
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const addCurrentEmailToList = () => {
+    if (currentEmail && isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
+      setEmails([...emails, currentEmail]);
+      setCurrentEmail('');
+    }
+  };
+
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      if (currentEmail && isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
-        setEmails([...emails, currentEmail]);
-        setCurrentEmail('');
-      }
+      addCurrentEmailToList();
     }
   };
 
@@ -30,15 +36,18 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
     setEmails(emails.filter(email => email !== emailToRemove));
   };
 
-  const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
+  // ✅ 1. UPDATE THE SendEmail FUNCTION
+  // This now checks for a valid email in the input box before sending.
   const SendEmail = () => {
-    if (emails.length === 0) return;
+    const emailsToSend = [...emails];
+    if (isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
+      emailsToSend.push(currentEmail);
+    }
+
+    if (emailsToSend.length === 0) return;
     
     setLoading(true);
-    const promises = emails.map(emailAddress => {
+    const promises = emailsToSend.map(emailAddress => {
       const data = {
         emailToSend: emailAddress,
         userName: user?.displayName,
@@ -49,29 +58,25 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
       };
       return GlobalApi.SendEmail(data);
     });
-
-    Promise.all(promises)
-      .then(() => {
-        setLoading(false);
-        if (onReceiversAdd) onReceiversAdd(emails); // <-- Store receivers in DB
-        setEmails([]);
-        toast.success('Emails sent successfully!');
-      })
-      .catch(error => {
-        console.error('Error sending emails:', error);
-        setLoading(false);
-        toast.error('Failed to send emails. Please try again.');
-      });
+    Promise.all(promises).then(() => {
+      setLoading(false);
+      if (onReceiversAdd) onReceiversAdd(emailsToSend);
+      setEmails([]);
+      setCurrentEmail('');
+      toast.success('Emails sent successfully!');
+    }).catch(error => {
+      console.error('Error sending emails:', error);
+      setLoading(false);
+      toast.error('Failed to send emails. Please try again.');
+    });
   };
 
   const handleCopy = () => {
     if (file?.shortUrl) {
-      navigator.clipboard.writeText(file.shortUrl)
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 800);
-        })
-        .catch((error) => console.error('Failed to copy URL:', error));
+      navigator.clipboard.writeText(file.shortUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 800);
+      });
     }
   };
 
@@ -84,7 +89,7 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
   return (
     <div className="flex flex-col gap-4 border p-5 rounded-md">
       
-      {/* ✅ Short URL Section */}
+      {/* Short URL Section */}
       <div>
         <label className="text-[14px] text-gray-500">Short URL</label>
         <div className="relative flex items-center p-2 border rounded-md">
@@ -102,7 +107,7 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
         </div>
       </div>
 
-      {/* ✅ Enable Password Section */}
+      {/* Enable Password Section */}
       <div className="flex items-center gap-3">
         <input
           type="checkbox"
@@ -135,35 +140,45 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
         </div>
       )}
 
-      {/* ✅ Send File via Email */}
+      {/* Send File via Email */}
       <div className="border rounded-md p-4">
         <label className="text-[14px] text-gray-500">Send File to Email</label>
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex flex-wrap gap-2 my-2">
           {emails.map((email, index) => (
             <div key={index} className="flex items-center bg-blue-100 px-2 py-1 rounded">
               <span className="text-sm text-blue-700">{email}</span>
-              <X 
-                size={14} 
-                className="ml-1 cursor-pointer text-blue-700 hover:text-blue-900"
-                onClick={() => removeEmail(email)}
-              />
+              <X size={14} className="ml-1 cursor-pointer hover:text-blue-900" onClick={() => removeEmail(email)} />
             </div>
           ))}
         </div>
-        <input
-          type="email"
-          placeholder="Enter multiple emails (press Enter or comma to add)"
-          className="border p-2 rounded-md w-full bg-transparent outline-none"
-          value={currentEmail}
-          onChange={(e) => setCurrentEmail(e.target.value)}
-          onKeyDown={handleAddEmail}
-        />
+        
+        <div className="flex gap-2">
+          <input
+            type="email"
+            placeholder="Enter email address"
+            className="border p-2 rounded-md w-full bg-transparent outline-none"
+            value={currentEmail}
+            onChange={(e) => setCurrentEmail(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={addCurrentEmailToList}
+          />
+          <button
+            type="button"
+            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+            onClick={addCurrentEmailToList}
+          >
+            Add
+          </button>
+        </div>
+
         <button
           className="p-2 disabled:bg-gray-300 bg-primary text-white hover:bg-blue-600 w-full mt-2 rounded-md flex justify-center"
           onClick={SendEmail}
-          disabled={loading || emails.length === 0}
+          // ✅ 2. UPDATE THE DISABLED LOGIC
+          // The button is enabled if the list is not empty OR if a valid email is currently typed.
+          disabled={loading || (emails.length === 0 && !isValidEmail(currentEmail))}
         >
-          {loading ? <ClipLoader size={20} color={"#ffffff"} /> : "Send Emails"}
+          {loading ? <ClipLoader size={20} color={"#ffffff"} /> : "Send Email(s)"}
         </button>
       </div>
     </div>

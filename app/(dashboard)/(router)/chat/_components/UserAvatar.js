@@ -1,7 +1,8 @@
-import Image from "next/image";
 import { memo } from "react";
+import Image from "next/image";
 
-const UserAvatar = memo(({ user, size = 40, fallbackBg = "bg-blue-100", fallbackTextColor = "text-blue-700", fallback = "U" }) => {
+// Memoized UserAvatar for performance
+const UserAvatar = memo(function UserAvatar({ user, size = 40, fallbackBg = "bg-blue-100", fallbackTextColor = "text-blue-700", fallback = "U" }) {
   if (user?.photoURL) {
     return (
       <Image

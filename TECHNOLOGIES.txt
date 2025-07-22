@@ -1,0 +1,1341 @@
+- Node.js (runtime for Next.js, API routes, and backend logic)
+- Next.js (React framework for SSR/SSG and API routes)
+- React (UI library)
+- Firebase (Firestore, Auth, Storage)
+- Nodemailer (for sending emails via Gmail SMTP)
+- Styled-components (for CSS-in-JS styling)
+- Lucide-react (icon library)
+- JSZip & file-saver (for ZIP downloads)
+- Vercel (hosting/deployment)
+
+
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+    getAuth, 
+    onAuthStateChanged, 
+    signInAnonymously, 
+    signInWithCustomToken 
+} from 'firebase/auth';
+import { 
+    getFirestore, 
+    collection, 
+    doc, 
+    addDoc, 
+    setDoc,
+    onSnapshot, 
+    query, 
+    orderBy,
+    where,
+    getDocs,
+    serverTimestamp
+} from 'firebase/firestore';
+import { 
+    MessageSquareText, 
+    Search, 
+    Plus, 
+    MoreVertical,
+    Phone, 
+    Video, 
+    Smile, 
+    Paperclip, 
+    Send,
+    Copy,
+    UserPlus,
+    X,
+    ArrowLeft
+} from 'lucide-react';
+import Image from 'next/image';
+
+// --- Firebase Configuration ---
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-chat-app-redesign';
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// --- Helper Functions ---
+const shortId = (id) => {
+  if (!id) return "";
+  if (id.length <= 12) return id;
+  return id.slice(0, 6) + "..." + id.slice(-4);
+};
+
+const shortName = (name, maxLen = 20) => {
+  if (!name) return "";
+  return name.length > maxLen ? name.slice(0, maxLen - 3) + "..." : name;
+};
+
+const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+        const date = timestamp.toDate();
+        const now = new Date();
+        const diffDays = (now.setHours(0,0,0,0) - new Date(date).setHours(0,0,0,0)) / (1000 * 60 * 60 * 24);
+
+        if (diffDays === 0) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        if (diffDays === 1) {
+            return 'Yesterday';
+        }
+        return date.toLocaleDateString();
+    } catch (error) {
+        return '';
+    }
+};
+
+// --- Child Components ---
+
+const UserAvatar = React.memo(({ user, size = 40 }) => {
+  if (user?.photoURL) {
+    return (
+      <Image
+        src={user.photoURL}
+        alt={user.displayName || "User"}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        onError={(e) => { e.target.style.display = 'none'; }}
+      />
+    );
+  }
+  const fallbackColor = `hsl(${user?.uid ? user.uid.charCodeAt(0) % 360 : 0}, 60%, 90%)`;
+  const fallbackTextColor = `hsl(${user?.uid ? user.uid.charCodeAt(0) % 360 : 0}, 50%, 40%)`;
+  
+  return (
+    <div
+      className="flex items-center justify-center font-bold rounded-full"
+      style={{ width: size, height: size, fontSize: size * 0.45, backgroundColor: fallbackColor, color: fallbackTextColor }}
+    >
+      {user?.displayName ? user.displayName[0].toUpperCase() : 'U'}
+    </div>
+  );
+});
+UserAvatar.displayName = 'UserAvatar';
+
+const Toast = ({ message }) => {
+  if (!message) return null;
+  return (
+    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-[100]" role="alert">
+      {message}
+    </div>
+  );
+};
+
+const AddIdModal = ({ show, onClose, onConnect, idError, setIdError }) => {
+  const [otherId, setOtherId] = useState("");
+  if (!show) return null;
+
+  const handleConnect = () => {
+    if (otherId.trim()) onConnect(otherId.trim());
+    else setIdError("Please enter a valid Chat ID.");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="font-bold text-xl text-gray-800 flex items-center gap-3">
+            <UserPlus className="w-6 h-6 text-indigo-600" /> Start New Chat
+          </h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
+            <X className="w-5 h-5 text-gray-500"/>
+          </button>
+        </div>
+        <p className="text-gray-600 mb-4">Enter the unique Chat ID of the user you wish to connect with.</p>
+        <input
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 mb-2 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          placeholder="Enter Chat ID"
+          value={otherId}
+          onChange={(e) => { setOtherId(e.target.value); setIdError(""); }}
+          onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+          autoFocus
+        />
+        {idError && <div className="text-sm text-red-500 mb-4">{idError}</div>}
+        <button
+          className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-shadow"
+          onClick={handleConnect}
+        >
+          Connect
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ChatList = ({ chatHistory, selectedUser, onSelectUser, onShowAddId }) => {
+    return (
+        <div className="bg-white flex flex-col h-full w-full">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" placeholder="Search chats..." className="w-full bg-gray-100 border border-transparent rounded-full pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+                {chatHistory.map((user) => (
+                    <div
+                        key={user.uid}
+                        className={`flex items-center gap-4 px-4 py-3 cursor-pointer border-l-4 transition-colors ${selectedUser?.uid === user.uid ? "bg-indigo-50 border-indigo-500" : "border-transparent hover:bg-gray-50"}`}
+                        onClick={() => onSelectUser(user)}
+                    >
+                        <UserAvatar user={user} size={48} />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                                <p className="font-semibold text-gray-800 truncate">{shortName(user.displayName)}</p>
+                                <p className="text-xs text-gray-400">{formatTimestamp(user.lastMessage?.timestamp)}</p>
+                            </div>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-sm text-gray-500 truncate">{user.lastMessage?.text || 'No messages yet'}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <footer className="p-4 flex-shrink-0 border-t border-gray-100">
+                 <button onClick={onShowAddId} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <Plus className="w-5 h-5" />
+                    Start New Chat
+                </button>
+            </footer>
+        </div>
+    );
+};
+
+const ChatInput = ({ onSendMessage }) => {
+  const [input, setInput] = useState("");
+  const inputRef = useRef(null);
+  
+  const handleSend = () => {
+    if (input.trim()) {
+        onSendMessage(input.trim());
+        setInput("");
+        inputRef.current?.focus();
+    }
+  };
+
+  return (
+    <footer className="px-4 md:px-6 py-3 bg-white/80 backdrop-blur-sm border-t border-gray-200">
+      <div className="flex items-center gap-3 bg-gray-100 rounded-full p-2">
+         <button className="p-2 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"><Smile /></button>
+         <button className="p-2 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"><Paperclip /></button>
+        <input
+          ref={inputRef}
+          className="flex-1 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type a message..."
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+        />
+        <button onClick={handleSend} className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transition-shadow" aria-label="Send message">
+          <Send className="w-5 h-5" />
+        </button>
+      </div>
+    </footer>
+  );
+};
+
+const ChatMessages = ({ messages, currentUserId, selectedUser }) => {
+  const messagesEndRef = useRef(null);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  const renderMessagesWithGrouping = () => {
+    let lastDate = null;
+    return messages.map((msg, i) => {
+      const msgDate = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleDateString() : null;
+      const showDateSeparator = msgDate && msgDate !== lastDate;
+      if (showDateSeparator) {
+        lastDate = msgDate;
+      }
+      
+      const isSender = msg.senderId === currentUserId;
+      const prevMsg = messages[i - 1];
+      const isFirstInGroup = !prevMsg || prevMsg.senderId !== msg.senderId || showDateSeparator;
+
+      return (
+        <React.Fragment key={msg.id}>
+          {showDateSeparator && (
+            <div className="text-center text-xs text-gray-400 py-4">
+              <span className="bg-gray-200 px-3 py-1 rounded-full">{new Date(msg.timestamp.toDate()).toDateString()}</span>
+            </div>
+          )}
+          <div className={`flex items-end gap-3 ${isSender ? "justify-end" : "justify-start"} ${isFirstInGroup ? 'mt-5' : 'mt-1'}`}>
+            {!isSender && (<div className="w-8 self-end">{isFirstInGroup && <UserAvatar user={selectedUser} size={32} />}</div>)}
+            <div className={`px-4 py-2.5 max-w-md lg:max-w-xl break-words rounded-2xl shadow-sm leading-relaxed ${isSender ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white rounded-br-lg" : "bg-gray-200 text-gray-800 rounded-bl-lg"}`}>
+              {!isSender && isFirstInGroup && (<p className="font-bold text-sm text-indigo-600 mb-1">{shortName(selectedUser.displayName)}</p>)}
+              <p>{msg.text}</p>
+            </div>
+          </div>
+        </React.Fragment>
+      );
+    });
+  };
+
+  return (
+    <section className="px-4 md:px-6 py-4 overflow-y-auto bg-gray-50">
+        {renderMessagesWithGrouping()}
+        <div ref={messagesEndRef} />
+    </section>
+  );
+};
+
+// --- Main App Component ---
+
+export default function ChatPage() {
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    
+    const [chatHistory, setChatHistory] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [messages, setMessages] = useState([]);
+    
+    const [showAddId, setShowAddId] = useState(false);
+    const [idError, setIdError] = useState("");
+    const [toast, setToast] = useState("");
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    useEffect(() => {
+        if (firebaseConfig && Object.keys(firebaseConfig).length > 0 && !getApps().length) {
+            const app = initializeApp(firebaseConfig);
+            setDb(getFirestore(app));
+            setAuth(getAuth(app));
+        } else if (getApps().length > 0) {
+            const app = getApp();
+            setDb(getFirestore(app));
+            setAuth(getAuth(app));
+        }
+    }, []);
+    
+    useEffect(() => {
+        if (!auth || !db) return;
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                try {
+                    const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, user.uid);
+                    const userProfile = { uid: user.uid, displayName: user.displayName || `User-${user.uid.slice(0, 6)}`, email: user.email, photoURL: user.photoURL, isOnline: true, lastSeen: serverTimestamp() };
+                    await setDoc(userDocRef, userProfile, { merge: true });
+                    setCurrentUser(userProfile);
+                } catch (error) { console.error("Error setting user profile:", error); }
+            } else {
+                try {
+                    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                    else await signInAnonymously(auth);
+                } catch (error) { console.error("Error during sign-in:", error); }
+            }
+        });
+        return () => unsubscribe();
+    }, [auth, db]);
+
+    useEffect(() => {
+        if (!db || !currentUser) return;
+        const usersCollection = collection(db, `artifacts/${appId}/public/data/users`);
+        const q = query(usersCollection, where("uid", "!=", currentUser.uid));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const usersData = snapshot.docs.map(doc => doc.data());
+            usersData.sort((a, b) => (b.lastMessage?.timestamp?.toMillis() || 0) - (a.lastMessage?.timestamp?.toMillis() || 0));
+            setChatHistory(usersData);
+        }, (error) => console.error("Error fetching chat history: ", error));
+        return () => unsubscribe();
+    }, [db, currentUser]);
+
+    useEffect(() => {
+        if (!db || !currentUser || !selectedUser) { setMessages([]); return; }
+        const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
+        const messagesCollection = collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`);
+        const q = query(messagesCollection, orderBy("timestamp", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))), (error) => console.error(`Error fetching messages: `, error));
+        return () => unsubscribe();
+    }, [db, currentUser, selectedUser]);
+    
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(""), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+    const handleSendMessage = async (text) => {
+        if (!db || !currentUser || !selectedUser) return;
+        const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
+        const messagesCollection = collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`);
+        await addDoc(messagesCollection, { text, senderId: currentUser.uid, receiverId: selectedUser.uid, timestamp: serverTimestamp() });
+        const lastMessageData = { text, timestamp: serverTimestamp() };
+        await setDoc(doc(db, `artifacts/${appId}/public/data/users`, currentUser.uid), { lastMessage: lastMessageData }, { merge: true });
+        await setDoc(doc(db, `artifacts/${appId}/public/data/users`, selectedUser.uid), { lastMessage: lastMessageData }, { merge: true });
+    };
+
+    const handleCopyId = () => {
+        if (currentUser?.uid) {
+            navigator.clipboard.writeText(currentUser.uid);
+            setToast("Your Chat ID has been copied!");
+        }
+    };
+    
+    const handleConnectById = async (id) => {
+        if (!db || !currentUser) return;
+        if (id === currentUser.uid) { setIdError("You can't chat with yourself."); return; }
+        const userQuery = query(collection(db, `artifacts/${appId}/public/data/users`), where("uid", "==", id));
+        const userSnapshot = await getDocs(userQuery);
+        if (!userSnapshot.empty) {
+            setSelectedUser(userSnapshot.docs[0].data());
+            setShowAddId(false);
+            setIdError("");
+        } else {
+            setIdError("User with that ID not found.");
+        }
+    };
+
+    if (!currentUser) {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4 text-gray-500">
+                    <MessageSquareText size={48} className="animate-pulse" />
+                    <p className="font-semibold">Connecting to Chat...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="w-full h-screen flex flex-col font-sans antialiased bg-white">
+            <Toast message={toast} />
+            <AddIdModal show={showAddId} onClose={() => { setShowAddId(false); setIdError(""); }} onConnect={handleConnectById} idError={idError} setIdError={setIdError} />
+
+            {/* Main Header for the Chat Page */}
+            <header className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-gray-200 flex-shrink-0">
+                {selectedUser && isMobile ? (
+                    // Mobile Conversation Header
+                    <>
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setSelectedUser(null)} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <UserAvatar user={selectedUser} size={40} />
+                            <div>
+                                <h2 className="font-bold text-gray-800">{selectedUser.displayName}</h2>
+                                <p className="text-sm text-green-500 font-semibold">{selectedUser.isOnline ? 'Online' : 'Offline'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Phone /></button>
+                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><MoreVertical /></button>
+                        </div>
+                    </>
+                ) : (
+                    // Default / Desktop Header
+                    <h1 className="font-bold text-2xl text-gray-800">Chats</h1>
+                )}
+            </header>
+
+            {/* This container holds the rest of the chat UI */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* --- Desktop Layout --- */}
+                <div className="hidden md:flex w-full h-full">
+                    <div className="w-full md:w-2/5 lg:w-1/3 xl:w-1/4 h-full flex-col border-r border-gray-200 flex">
+                        <ChatList
+                            chatHistory={chatHistory}
+                            selectedUser={selectedUser}
+                            onSelectUser={setSelectedUser}
+                            onShowAddId={() => setShowAddId(true)}
+                        />
+                    </div>
+                    <div className="flex-1 h-full grid grid-rows-[auto_1fr_auto]">
+                        {selectedUser ? (
+                            <>
+                                <header className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-gray-200 bg-white">
+                                    <div className="flex items-center gap-4">
+                                        <UserAvatar user={selectedUser} size={40} />
+                                        <div>
+                                            <h2 className="font-bold text-gray-800">{selectedUser.displayName}</h2>
+                                            <p className="text-sm text-green-500 font-semibold">{selectedUser.isOnline ? 'Online' : 'Offline'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Phone /></button>
+                                        <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Video /></button>
+                                        <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><MoreVertical /></button>
+                                    </div>
+                                </header>
+                                <ChatMessages messages={messages} currentUserId={currentUser.uid} selectedUser={selectedUser} />
+                                <ChatInput onSendMessage={handleSendMessage} />
+                            </>
+                        ) : (
+                            <div className="flex flex-1 flex-col items-center justify-center text-gray-400 p-8">
+                                <MessageSquareText size={80} className="text-gray-300 mb-4" />
+                                <h2 className="font-bold text-xl text-gray-500">Welcome, {shortName(currentUser.displayName)}!</h2>
+                                <p className="mt-2 text-center max-w-sm">Select a conversation to get started.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* --- Mobile Layout --- */}
+                <div className="w-full h-full md:hidden">
+                    {!selectedUser ? (
+                        <ChatList
+                            chatHistory={chatHistory}
+                            selectedUser={selectedUser}
+                            onSelectUser={setSelectedUser}
+                            onShowAddId={() => setShowAddId(true)}
+                        />
+                    ) : (
+                        <div className="w-full h-full grid grid-rows-[1fr_auto]">
+                            <ChatMessages messages={messages} currentUserId={currentUser.uid} selectedUser={selectedUser} />
+                            <ChatInput onSendMessage={handleSendMessage} />
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { useAuth } from "../../../_utils/FirebaseAuthContext";
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInAnonymously,
+    signInWithCustomToken
+} from 'firebase/auth';
+import {
+    getFirestore,
+    collection,
+    doc,
+    addDoc,
+    setDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    where,
+    getDocs,
+    serverTimestamp,
+    writeBatch,
+    arrayUnion,
+    documentId,
+    getDoc,
+    deleteDoc
+} from 'firebase/firestore';
+import {
+    MessageSquareText,
+    Search,
+    Plus,
+    MoreVertical,
+    Phone,
+    Video,
+    Smile,
+    Send,
+    Trash2,
+    UserPlus,
+    X,
+    ArrowLeft,
+    Copy,
+    ShieldCheck
+} from 'lucide-react';
+import Image from 'next/image';
+import EmojiPicker from 'emoji-picker-react';
+
+
+// --- CONFIGURATION START ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDVMyUGspuZLwjckqv1sb9CpBg3xXkQ56g",
+  authDomain: "file-sharing-app-c63a0.firebaseapp.com",
+  projectId: "file-sharing-app-c63a0",
+  storageBucket: "file-sharing-app-c63a0.appspot.com",
+  messagingSenderId: "616447313925",
+  appId: "1:616447313925:web:db692a9c95ae28f17df46c",
+  measurementId: "G-F5G183J837"
+};
+
+const appId = firebaseConfig.projectId;
+const initialAuthToken = null;
+// --- CONFIGURATION END ---
+
+// --- NEW HELPER: Unique ID Generation ---
+async function generateUniqueIdWithTag(username, db) {
+  const sanitizedUsername = username.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/gi, '');
+  if (!sanitizedUsername) return null;
+
+  let uniqueId = "";
+  let isUnique = false;
+  let attempts = 0;
+
+  while (!isUnique && attempts < 20) {
+    const discriminator = Math.floor(1000 + Math.random() * 9000);
+    const potentialId = `${sanitizedUsername}_${discriminator}`;
+
+    const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+    const q = query(usersRef, where("uniqueId", "==", potentialId));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      isUnique = true;
+      uniqueId = potentialId;
+    }
+    attempts++;
+  }
+  return uniqueId;
+}
+
+
+// --- Helper Functions ---
+const shortName = (name, maxLen = 20) => {
+  if (!name) return "";
+  return name.length > maxLen ? name.slice(0, maxLen - 3) + "..." : name;
+};
+
+const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+        const date = timestamp.toDate();
+        const now = new Date();
+        const diffDays = (now.setHours(0,0,0,0) - new Date(date).setHours(0,0,0,0)) / (1000 * 60 * 60 * 24);
+
+        if (diffDays === 0) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        if (diffDays === 1) {
+            return 'Yesterday';
+        }
+        return date.toLocaleDateString();
+    } catch (error) {
+        return '';
+    }
+};
+
+// --- Child Components ---
+const UserAvatar = React.memo(({ user, size = 40 }) => {
+  if (user?.photoURL) {
+    return (
+      <Image
+        src={user.photoURL}
+        alt={user.displayName || "User"}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        onError={(e) => { e.target.style.display = 'none'; }}
+      />
+    );
+  }
+  const fallbackColor = `hsl(${user?.uid ? user.uid.charCodeAt(0) % 360 : 0}, 60%, 90%)`;
+  const fallbackTextColor = `hsl(${user?.uid ? user.uid.charCodeAt(0) % 360 : 0}, 50%, 40%)`;
+
+  return (
+    <div
+      className="flex items-center justify-center font-bold rounded-full"
+      style={{ width: size, height: size, fontSize: size * 0.45, backgroundColor: fallbackColor, color: fallbackTextColor }}
+    >
+      {user?.displayName ? user.displayName[0].toUpperCase() : 'U'}
+    </div>
+  );
+});
+UserAvatar.displayName = 'UserAvatar';
+
+const Toast = ({ message }) => {
+  if (!message) return null;
+  return (
+    <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-[100]" role="alert">
+      {message}
+    </div>
+  );
+};
+
+const AddIdModal = ({ show, onClose, onConnect, idError, setIdError }) => {
+  const [otherId, setOtherId] = useState("");
+  if (!show) return null;
+
+  const handleConnect = () => {
+    if (otherId.trim()) onConnect(otherId.trim());
+    else setIdError("Please enter a valid User ID (e.g., username_1234).");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="font-bold text-xl text-gray-800 flex items-center gap-3">
+            <UserPlus className="w-6 h-6 text-indigo-600" /> Start New Chat
+          </h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100">
+            <X className="w-5 h-5 text-gray-500"/>
+          </button>
+        </div>
+        <p className="text-gray-600 mb-4">Enter the unique User ID of the person you wish to connect with.</p>
+        <input
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 mb-2 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          placeholder="username_1234"
+          value={otherId}
+          onChange={(e) => { setOtherId(e.target.value); setIdError(""); }}
+          onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+          autoFocus
+        />
+        {idError && <div className="text-sm text-red-500 mb-4">{idError}</div>}
+        <button
+          className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-shadow"
+          onClick={handleConnect}
+        >
+          Connect
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ChatList = ({ chatHistory, selectedUser, onSelectUser, onShowAddId, unreadCounts, onDeleteChat, currentUser, onCopyId }) => {
+    const [openMenu, setOpenMenu] = useState(null);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setOpenMenu(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    return (
+        <div className="bg-white flex flex-col h-full w-full">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
+                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-indigo-700 font-semibold mb-1">Your Unique ID</p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-mono text-sm text-indigo-900 truncate flex-1">{currentUser?.uniqueId || currentUser?.uid}</p>
+                        <button onClick={() => onCopyId(currentUser?.uniqueId || currentUser?.uid)} className="p-1 text-indigo-600 hover:bg-indigo-200 rounded-md" title="Copy ID">
+                            <Copy size={16}/>
+                        </button>
+                    </div>
+                </div>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" placeholder="Search chats..." className="w-full bg-gray-100 border border-transparent rounded-full pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+                {chatHistory.map((user) => (
+                    <div
+                        key={user.uid}
+                        className={`flex items-center gap-4 px-4 py-3 cursor-pointer border-l-4 transition-colors relative group ${selectedUser?.uid === user.uid ? "bg-indigo-50 border-indigo-500" : "border-transparent hover:bg-gray-50"}`}
+                        onClick={() => onSelectUser(user)}
+                    >
+                        <UserAvatar user={user} size={48} showOnlineStatus={true} />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                                <p className="font-semibold text-gray-800 truncate">{shortName(user.displayName)}</p>
+                                <p className="text-xs text-gray-400">{formatTimestamp(user.lastMessage?.timestamp)}</p>
+                            </div>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-sm text-gray-500 truncate pr-6">{user.lastMessage?.text || 'No messages yet'}</p>
+                                {unreadCounts[user.uid] > 0 && (
+                                    <span className="bg-indigo-500 text-white text-xs font-bold rounded-full h-5 min-w-[1.25rem] flex items-center justify-center px-1">
+                                        {unreadCounts[user.uid]}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                         <div className="absolute right-2 top-1/2 -translate-y-1/2" ref={openMenu === user.uid ? menuRef : null}>
+                            <button onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === user.uid ? null : user.uid); }} className="p-2 rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-200 transition-opacity">
+                                <MoreVertical size={20} />
+                            </button>
+                            {openMenu === user.uid && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl z-20 border border-gray-100">
+                                    <button onClick={(e) => { e.stopPropagation(); onDeleteChat(user.uid); setOpenMenu(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                        <Trash2 size={16} /> Delete Chat
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <footer className="p-4 flex-shrink-0 border-t border-gray-100">
+                 <button onClick={onShowAddId} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <Plus className="w-5 h-5" />
+                    Start New Chat
+                </button>
+            </footer>
+        </div>
+    );
+};
+
+const ChatMessages = ({ messages, currentUserId, selectedUser, onMessageAction, selectedMessages }) => {
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const longPressTimerRef = useRef();
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  useEffect(() => {
+    if (isAtBottom && selectedMessages.size === 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isAtBottom, selectedMessages.size]);
+
+  const handleScroll = () => {
+    const container = chatContainerRef.current;
+    if (container) {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+        setIsAtBottom(atBottom);
+    }
+  };
+
+  const handleMessageClick = (msg) => {
+    onMessageAction('click', msg);
+  };
+  
+  const handleContextMenu = (e, msg) => {
+    e.preventDefault();
+    onMessageAction('contextmenu', msg);
+  };
+  
+  const handleTouchStart = (e, msg) => {
+    longPressTimerRef.current = setTimeout(() => {
+      onMessageAction('longpress', msg);
+    }, 500);
+  };
+
+  const handleTouchEnd = () => clearTimeout(longPressTimerRef.current);
+  
+  return (
+    <section ref={chatContainerRef} onScroll={handleScroll} className="px-4 md:px-6 py-4 overflow-y-auto bg-[#f9fafb] relative">
+      <div
+        className="absolute inset-0 bg-repeat opacity-[0.04] z-0"
+        style={{ backgroundImage: `url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48c3R5bGU+dGV4dCB7IGZvbnQtc2l6ZTogMjBweDsgfTwvc3R5bGU+PHRleHQgeD0iMjAiIHk9IjQwIj7wn5iGPC90ZXh0Pjx0ZXh0IHg9IjE1MCIgeT0iODAiPvCfmYU8L3RleHQ+PHRleHQgeD0iMjUwIiB5PSI1MCI+8J+QjzwvdGV4dD48dGV4dCB4PSI4MCIgeT0iMTUwIj7wn5GOPC90ZXh0Pjx0ZXh0IHg9IjIwIiB5PSIyNTAiPvCfmoo8L3RleHQ+PHRleHQgeD0iMjIwIiB5PSIyMDAiPvCfjZk8L3RleHQ+PC9zdmc+')`, backgroundSize: '350px' }}
+      />
+      {messages.map((msg, i) => {
+        const isSender = msg.senderId === currentUserId;
+        const isSelected = selectedMessages.has(msg.id);
+
+        return (
+          <div
+            key={msg.id}
+            onClick={() => isSender && handleMessageClick(msg)}
+            onContextMenu={(e) => isSender && handleContextMenu(e, msg)}
+            onTouchStart={(e) => isSender && handleTouchStart(e, msg)}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
+            className={`flex items-end gap-3 relative z-10 my-1 transition-colors duration-300 rounded-lg ${isSender ? "justify-end" : "justify-start"} ${isSelected ? 'bg-blue-200' : 'bg-transparent'}`}
+          >
+            {!isSender && (
+              <div className="w-8 self-end relative">
+                <UserAvatar user={{...selectedUser, photoURL: msg.senderPhotoURL}} size={32} />
+              </div>
+            )}
+            <div className={`px-4 py-2.5 max-w-md lg:max-w-xl break-words rounded-2xl shadow-sm leading-relaxed ${isSender ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white rounded-br-lg" : "bg-gray-200 text-gray-800 rounded-bl-lg"}`}>
+              {!isSender && (<p className="font-bold text-sm text-indigo-600 mb-1">{shortName(msg.senderDisplayName)}</p>)}
+              <p>{msg.text}</p>
+            </div>
+          </div>
+        );
+      })}
+      <div ref={messagesEndRef} />
+    </section>
+  );
+};
+
+// --- Main App Component ---
+export default function ChatPage() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    
+    const [chatHistory, setChatHistory] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [messages, setMessages] = useState([]);
+
+    const [unreadCounts, setUnreadCounts] = useState({});
+    const [showAddId, setShowAddId] = useState(false);
+    const [idError, setIdError] = useState("");
+    const [toast, setToast] = useState("");
+    const [isMobile, setIsMobile] = useState(false);
+
+    const [input, setInput] = useState("");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    
+    const [selectedMessages, setSelectedMessages] = useState(new Set());
+    
+    const emojiPickerRef = useRef(null);
+    const emojiButtonRef = useRef(null);
+    const inputRef = useRef(null);
+    const messageListenersRef = useRef({});
+    const { user, loading } = useAuth();
+  
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+     useEffect(() => {
+        if (!loading && !user) {
+          router.replace(`/login?redirect_url=${encodeURIComponent(pathname)}`);
+        }
+      }, [loading, user, router, pathname]);
+
+    useEffect(() => {
+        if (!getApps().length) {
+            const app = initializeApp(firebaseConfig);
+            setDb(getFirestore(app));
+            setAuth(getAuth(app));
+        } else {
+            const app = getApp();
+            setDb(getFirestore(app));
+            setAuth(getAuth(app));
+        }
+    }, []);
+
+    // **FIXED: Auth state listener**
+    useEffect(() => {
+        if (!auth || !db) return;
+
+        let userDocListener = () => {}; // Holds the unsubscribe function for the user document
+
+        const authStateUnsubscribe = onAuthStateChanged(auth, async (user) => {
+            userDocListener(); // Unsubscribe from any previous user's document listener
+
+            if (user) {
+                const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, user.uid);
+                
+                // This now correctly sets up a listener for the currently logged-in user
+                userDocListener = onSnapshot(userDocRef, async (docSnap) => {
+                    if (!docSnap.exists()) {
+                        const displayName = user.displayName || `User-${user.uid.slice(0, 6)}`;
+                        const uniqueId = await generateUniqueIdWithTag(displayName, db);
+                        const userData = {
+                            uid: user.uid, uniqueId: uniqueId, displayName: displayName, email: user.email,
+                            photoURL: user.photoURL, isOnline: true, lastSeen: serverTimestamp()
+                        };
+                        await setDoc(userDocRef, userData, { merge: true });
+                        setCurrentUser(userData);
+                    } else {
+                        setCurrentUser(docSnap.data());
+                    }
+                });
+
+            } else {
+                setCurrentUser(null);
+                try {
+                    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken); 
+                    else await signInAnonymously(auth);
+                } catch (error) { console.error("Error during sign-in:", error); }
+            }
+        });
+
+        // Cleanup function for the useEffect hook
+        return () => {
+            authStateUnsubscribe(); // Clean up the auth state listener
+            userDocListener();      // Clean up the user document listener
+        };
+    }, [auth, db]);
+
+    useEffect(() => {
+        if (!db || !currentUser) return;
+        let userIds = currentUser.chatHistory || [];
+        if (userIds.length === 0) { 
+            setChatHistory([]); 
+            return; 
+        }
+        const usersQuery = query(collection(db, `artifacts/${appId}/public/data/users`), where(documentId(), "in", userIds));
+        const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+            const usersData = snapshot.docs.map(doc => doc.data());
+            usersData.sort((a, b) => (b.lastMessage?.timestamp?.toMillis() || 0) - (a.lastMessage?.timestamp?.toMillis() || 0));
+            setChatHistory(usersData);
+        });
+        return () => unsubscribe();
+    }, [db, currentUser]);
+
+    useEffect(() => {
+        if (!db || !currentUser || !selectedUser) {
+            setMessages([]);
+            return;
+        }
+        setSelectedMessages(new Set());
+
+        const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
+        const messagesCollection = collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`);
+        const q = query(messagesCollection, orderBy("timestamp", "asc"));
+
+        updateLastRead(chatId, currentUser.uid);
+
+        const unsubscribe = onSnapshot(q, (snapshot) => setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+        return () => unsubscribe();
+    }, [db, currentUser, selectedUser]);
+    
+    useEffect(() => {
+        if (!db || !currentUser || chatHistory.length === 0) return;
+
+        Object.values(messageListenersRef.current).forEach(unsub => unsub());
+        messageListenersRef.current = {};
+        
+        chatHistory.forEach(user => {
+            if (!user?.uid) return;
+            
+            const chatId = [currentUser.uid, user.uid].sort().join('_');
+            const lastReadRef = doc(db, `artifacts/${appId}/public/data/chats/${chatId}/lastRead`, currentUser.uid);
+
+            messageListenersRef.current[user.uid] = onSnapshot(lastReadRef, async (docSnap) => {
+                const lastReadTimestamp = docSnap.exists() ? docSnap.data().timestamp : null;
+                const messagesRef = collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`);
+                const unreadQuery = query(messagesRef, where("senderId", "==", user.uid), where("timestamp", ">", lastReadTimestamp || new Date(0)));
+                const unreadSnapshot = await getDocs(unreadQuery);
+                setUnreadCounts(prev => ({...prev, [user.uid]: unreadSnapshot.size}));
+            });
+        });
+        return () => { Object.values(messageListenersRef.current).forEach(unsub => unsub()); };
+    }, [db, currentUser, chatHistory]);
+
+    useEffect(() => {
+        if (toast) { const timer = setTimeout(() => setToast(""), 3000); return () => clearTimeout(timer); }
+    }, [toast]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(event.target) && !emojiButtonRef.current.contains(event.target)) {
+                setShowEmojiPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showEmojiPicker]);
+
+    if (loading || !user) return null;
+
+    const updateLastRead = async (chatId, userId) => {
+      if (!db || !currentUser) return;
+      const lastReadRef = doc(db, `artifacts/${appId}/public/data/chats/${chatId}/lastRead`, userId);
+      await setDoc(lastReadRef, { timestamp: serverTimestamp() });
+    };
+    
+    // **FIXED: `handleSendMessage` function**
+    const handleSendMessage = async () => {
+        if (!db || !currentUser || !selectedUser || !input.trim()) return;
+        const textToSend = input.trim();
+        setInput("");
+        setShowEmojiPicker(false);
+        inputRef.current?.focus();
+
+        const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
+        const messagesCollection = collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`);
+
+        try {
+            await addDoc(messagesCollection, {
+                text: textToSend, senderId: currentUser.uid, receiverId: selectedUser.uid, 
+                timestamp: serverTimestamp(), senderDisplayName: currentUser.displayName, senderPhotoURL: currentUser.photoURL
+            });
+            
+            const lastMessageData = { text: textToSend, timestamp: serverTimestamp() };
+            const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, currentUser.uid);
+            const selectedUserDocRef = doc(db, `artifacts/${appId}/public/data/users`, selectedUser.uid);
+            
+            const batch = writeBatch(db);
+            batch.set(userDocRef, { lastMessage: lastMessageData, chatHistory: arrayUnion(selectedUser.uid) }, { merge: true });
+            batch.set(selectedUserDocRef, { lastMessage: lastMessageData, chatHistory: arrayUnion(currentUser.uid) }, { merge: true });
+            await batch.commit();
+            
+            // The redundant `setChatHistory` call that caused the UI flicker has been removed.
+            // Your `onSnapshot` listener will now handle this update smoothly and efficiently.
+
+        } catch (error) {
+            console.error("Error sending message: ", error);
+            setInput(textToSend);
+            setToast("Error: Could not send message.");
+        }
+    };
+    
+    const handleConnectById = async (id) => {
+        if (!db || !currentUser) return;
+        if (id === currentUser.uniqueId) { setIdError("You can't chat with yourself."); return; }
+        
+        const usersRef = collection(db, `artifacts/${appId}/public/data/users`);
+        const q = query(usersRef, where("uniqueId", "==", id));
+        const userSnapshot = await getDocs(q);
+
+        if (!userSnapshot.empty) {
+            const newUserData = userSnapshot.docs[0].data();
+            setSelectedUser(newUserData);
+            setShowAddId(false);
+            setIdError("");
+            if (!currentUser.chatHistory?.includes(newUserData.uid)) {
+                const currentUserDocRef = doc(db, `artifacts/${appId}/public/data/users`, currentUser.uid);
+                await setDoc(currentUserDocRef, { chatHistory: arrayUnion(newUserData.uid) }, { merge: true });
+            }
+        } else {
+            setIdError("User with that ID not found.");
+        }
+    };
+    
+    const handleCopyId = (id) => {
+        navigator.clipboard.writeText(id);
+        setToast("Your ID has been copied to the clipboard!");
+    };
+
+    const handleDeleteChat = async (otherUserId) => {
+        if (!db || !currentUser || !window.confirm("Are you sure? This will delete the entire conversation and cannot be undone.")) return;
+        if (selectedUser?.uid === otherUserId) setSelectedUser(null);
+
+        const chatId = [currentUser.uid, otherUserId].sort().join('_');
+        const messagesPath = `artifacts/${appId}/public/data/chats/${chatId}/messages`;
+        const messagesRef = collection(db, messagesPath);
+
+        try {
+            const messagesSnapshot = await getDocs(messagesRef);
+            const batch = writeBatch(db);
+            messagesSnapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            setToast("Chat deleted successfully.");
+            const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, currentUser.uid);
+            const updatedHistory = (currentUser.chatHistory || []).filter(uid => uid !== otherUserId);
+            await setDoc(userDocRef, { chatHistory: updatedHistory }, { merge: true });
+        } catch (error) {
+            console.error("Error deleting chat: ", error);
+            setToast("Failed to delete chat.");
+        }
+    };
+    
+    const handleBulkDelete = async () => {
+        if (selectedMessages.size === 0 || !selectedUser) return;
+
+        const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
+        const batch = writeBatch(db);
+        selectedMessages.forEach(messageId => {
+            const messageRef = doc(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`, messageId);
+            batch.delete(messageRef);
+        });
+        
+        try {
+            await batch.commit();
+            setToast(`${selectedMessages.size} message(s) deleted.`);
+            setSelectedMessages(new Set());
+        } catch (error) {
+            console.error("Error deleting messages: ", error);
+            setToast("Failed to delete messages.");
+        }
+    };
+
+    const handleMessageAction = (action, message) => {
+        if (selectedMessages.size === 0 && (action === 'contextmenu' || action === 'longpress')) {
+            setSelectedMessages(new Set([message.id]));
+            return;
+        }
+        if (selectedMessages.size > 0) {
+            const newSelection = new Set(selectedMessages);
+            if (newSelection.has(message.id)) {
+                newSelection.delete(message.id);
+            } else {
+                newSelection.add(message.id);
+            }
+            setSelectedMessages(newSelection);
+        }
+    };
+    
+    const handleEmojiClick = (emojiObject) => {
+        setInput(prevInput => prevInput + emojiObject.emoji);
+    };
+
+    if (!currentUser) {
+        return (
+            <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4 text-gray-500">
+                    <MessageSquareText size={48} className="animate-pulse" />
+                    <p className="font-semibold">Connecting to Chat...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="w-full h-screen flex flex-col font-sans antialiased bg-white">
+            <Toast message={toast}  />
+            <AddIdModal show={showAddId} onClose={() => { setShowAddId(false); setIdError(""); }} onConnect={handleConnectById} idError={idError} setIdError={setIdError} />
+
+            <header className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-gray-200 flex-shrink-0">
+                {selectedUser && isMobile ? (
+                    <>
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setSelectedUser(null)} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <UserAvatar user={selectedUser} size={40} />
+                            <div className="min-w-0">
+                                <h2 className="font-bold text-gray-800">{selectedUser.displayName}</h2>
+                                <p className="text-sm text-green-500 font-semibold">{selectedUser.isOnline ? 'Online' : 'Offline'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><Phone /></button>
+                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"><MoreVertical /></button>
+                        </div>
+                    </>
+                ) : (
+                    <h1 className="font-bold text-2xl text-gray-800">Chats</h1>
+                )}
+            </header>
+
+            <div className="flex-1 flex overflow-hidden">
+                {/* Desktop Layout */}
+                <div className="hidden md:flex w-full h-full">
+                    <div className="w-full md:w-2/5 lg:w-1/3 xl:w-1/4 h-full flex-col border-r border-gray-200 flex">
+                        <ChatList chatHistory={chatHistory} selectedUser={selectedUser} onSelectUser={setSelectedUser} onShowAddId={() => setShowAddId(true)} unreadCounts={unreadCounts} onDeleteChat={handleDeleteChat} currentUser={currentUser} onCopyId={handleCopyId} />
+                    </div>
+                    <div className="flex-1 h-full grid grid-rows-[auto_1fr_auto] relative">
+                        {selectedUser || selectedMessages.size > 0 ? (
+                            <>
+                                <header className="flex items-center justify-between gap-4 px-4 md:px-6 py-3 border-b border-gray-200 bg-white z-20 sticky top-0">
+                                {selectedMessages.size > 0 ? (
+                                    <>
+                                        <div className="flex items-center gap-4">
+                                            <button onClick={() => setSelectedMessages(new Set())} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+                                            <p className="font-semibold text-gray-700">{selectedMessages.size} selected</p>
+                                        </div>
+                                        <button onClick={handleBulkDelete} className="p-2 text-red-500 hover:bg-red-100 rounded-full" aria-label="Delete selected messages"><Trash2 /></button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center gap-4">
+                                            <UserAvatar user={selectedUser} size={40} />
+                                            <div className="min-w-0">
+                                                <h2 className="font-bold text-gray-800">{selectedUser.displayName}</h2>
+                                                <p className="text-sm text-green-500 font-semibold">{selectedUser.isOnline ? 'Online' : 'Offline'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500"><Phone /></button>
+                                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500"><Video /></button>
+                                            <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500"><MoreVertical /></button>
+                                        </div>
+                                    </>
+                                )}
+                                </header>
+                                <ChatMessages messages={messages} currentUserId={currentUser.uid} selectedUser={selectedUser} onMessageAction={handleMessageAction} selectedMessages={selectedMessages} />
+                                
+                                <footer className="px-4 md:px-6 py-3 bg-white/80 backdrop-blur-sm border-t border-gray-200 relative z-20">
+                                    {showEmojiPicker && (
+                                        <div ref={emojiPickerRef} className="absolute bottom-full mb-2">
+                                            <EmojiPicker onEmojiClick={handleEmojiClick} height={400} width={350} />
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-3 bg-gray-100 rounded-full p-2">
+                                        <button ref={emojiButtonRef} onClick={() => setShowEmojiPicker(prev => !prev)} className="p-2 rounded-full hover:bg-gray-200 text-gray-500">
+                                            <Smile />
+                                        </button>                                        
+                                        <input
+                                            ref={inputRef}
+                                            className="flex-1 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500"
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            placeholder="Type a message..."
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }}}
+                                        />
+                                        <button onClick={handleSendMessage} className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transition-shadow" aria-label="Send message">
+                                            <Send className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </footer>
+                            </>
+                        ) : (
+                            <div className="flex flex-1 flex-col items-center justify-center text-gray-400 p-8">
+                                    <MessageSquareText size={80} className="text-gray-300 mb-4" />
+                                    <h2 className="font-bold text-xl text-gray-500">Welcome, {shortName(currentUser.displayName)}!</h2>
+                                    <p className="mt-2 text-center max-w-sm">Select a conversation or start a new one to get started.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Mobile Layout */}
+                <div className="w-full h-full md:hidden">
+                {!selectedUser ? (
+                    <ChatList chatHistory={chatHistory} selectedUser={selectedUser} onSelectUser={setSelectedUser} onShowAddId={() => setShowAddId(true)} unreadCounts={unreadCounts} onDeleteChat={handleDeleteChat} currentUser={currentUser} onCopyId={handleCopyId} />
+                ) : (
+                    <div className="w-full h-full grid grid-rows-[auto_1fr_auto] relative">
+                             {selectedMessages.size > 0 && (
+                                <div className="absolute top-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-sm p-4 border-b border-gray-200 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={() => setSelectedMessages(new Set())} className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+                                        <p className="font-semibold text-gray-700">{selectedMessages.size} selected</p>
+                                    </div>
+                                    <button onClick={handleBulkDelete} className="p-2 text-red-500 hover:bg-red-100 rounded-full" aria-label="Delete selected messages"><Trash2 /></button>
+                                </div>
+                             )}
+                            <ChatMessages messages={messages} currentUserId={currentUser.uid} selectedUser={selectedUser} onMessageAction={handleMessageAction} selectedMessages={selectedMessages} />
+                            <footer className="px-4 py-3 bg-white/80 backdrop-blur-sm border-t border-gray-200 relative">
+                                {showEmojiPicker && (
+                                    <div ref={emojiPickerRef} className="absolute bottom-full mb-2">
+                                        <EmojiPicker onEmojiClick={handleEmojiClick} height={400} width="100%" />
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3 bg-gray-100 rounded-full p-2">
+                                    <button ref={emojiButtonRef} onClick={() => setShowEmojiPicker(prev => !prev)} className="p-2 rounded-full hover:bg-gray-200 text-gray-500">
+                                        <Smile />
+                                    </button>                                    
+                                    <input
+                                        ref={inputRef}
+                                        className="flex-1 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        placeholder="Type a message..."
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }}}
+                                    />
+                                    <button onClick={handleSendMessage} className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-3 rounded-full shadow-md hover:shadow-lg transition-shadow" aria-label="Send message">
+                                        <Send className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                
+                            </footer>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+
+
+
+
+
+
+
+
+
