@@ -63,7 +63,7 @@ export const PresenceProvider = ({ children }) => {
 
     if (socketRef.current) return;
 
-    const socket = io();
+    const socket = io('https://cloudsharing-backend.onrender.com/');
     socketRef.current = socket;
 
     socket.on('connect', () => {
