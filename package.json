@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "@headlessui/react": "^2.2.4",
     "@react-email/components": "^0.1.0",
     "@vercel/edge-config": "^1.1.1",
+    "ably": "^2.10.1",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
     "emoji-picker-react": "^4.13.2",
@@ -42,7 +43,6 @@
     "recharts": "^3.0.0",
     "resend": "^3.2.0",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
     "styled-components": "^6.1.11",
     "uuid": "^11.1.0",
     "webpack": "^5.91.0",
