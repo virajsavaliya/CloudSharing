@@ -1,3 +1,5 @@
+// app/_components/PresenceProvider.js
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
@@ -8,6 +10,7 @@ import toast from 'react-hot-toast';
 const PresenceContext = createContext(null);
 const peerConnectionConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 const FILE_CHUNK_SIZE = 64 * 1024;
+const SIGNALING_SERVER_URL = "https://cloudsharing-backend.onrender.com";
 
 export const PresenceProvider = ({ children }) => {
   const { user } = useAuth();
@@ -18,9 +21,7 @@ export const PresenceProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   const createPeerConnection = useCallback((peerId) => {
-    if (peerConnectionsRef.current[peerId]) {
-        peerConnectionsRef.current[peerId].peer.close();
-    }
+    if (peerConnectionsRef.current[peerId]) peerConnectionsRef.current[peerId].peer.close();
     const peer = new RTCPeerConnection(peerConnectionConfig);
     peerConnectionsRef.current[peerId] = { peer, candidates: [] };
     peer.onicecandidate = (event) => {
@@ -48,8 +49,6 @@ export const PresenceProvider = ({ children }) => {
     fileOfferRef.current = { targetSocketId, file };
   }, [user]);
 
-  // Effect for managing the socket connection lifecycle.
-  // This now only depends on `user`, so it won't re-run when `peers` changes.
   useEffect(() => {
     if (!user) {
       if (socketRef.current) {
@@ -63,19 +62,14 @@ export const PresenceProvider = ({ children }) => {
 
     if (socketRef.current) return;
 
-    const socket = io('https://cloudsharing-backend.onrender.com/');
+    const socket = io(SIGNALING_SERVER_URL);
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setIsConnected(true);
       socket.emit('join-room', { displayName: user.displayName, uid: user.uid });
     });
-    socket.on('disconnect', () => {
-        setIsConnected(false);
-        setPeers({});
-        peerConnectionsRef.current = {};
-    });
-    
+    socket.on('disconnect', () => setIsConnected(false));
     socket.on('existing-users', (existingUsers) => setPeers(existingUsers));
     socket.on('user-joined', (data) => setPeers(prev => ({ ...prev, [data.id]: data.user })));
     socket.on('user-left', (peerId) => {
@@ -90,22 +84,7 @@ export const PresenceProvider = ({ children }) => {
       }
     });
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
-  }, [user]);
-
-  // Effect for handling incoming signals.
-  // This hook re-runs when `peers` changes, ensuring the signal handler has the latest `peers` state
-  // without resetting the entire connection.
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
-
-    const signalHandler = async (data) => {
+    socket.on('signal', async (data) => {
       const { from, signal } = data;
       if (signal.type) {
         switch (signal.type) {
@@ -141,7 +120,8 @@ export const PresenceProvider = ({ children }) => {
             }
             break;
           case 'file-decline':
-            toast.error(`${peers[from]?.displayName || 'Another user'} declined the transfer.`);
+            const sender = peers[from];
+            toast.error(`${sender?.displayName || 'Another user'} declined the transfer.`);
             break;
         }
         return;
@@ -149,8 +129,8 @@ export const PresenceProvider = ({ children }) => {
       
       let pcWrapper = peerConnectionsRef.current[from];
       if (!pcWrapper) {
-        pcWrapper = { peer: createPeerConnection(from), candidates: [] };
-        peerConnectionsRef.current[from] = pcWrapper;
+        createPeerConnection(from);
+        pcWrapper = peerConnectionsRef.current[from];
       }
       const peer = pcWrapper.peer;
       if (signal.sdp) {
@@ -168,14 +148,15 @@ export const PresenceProvider = ({ children }) => {
         if (peer.remoteDescription) await peer.addIceCandidate(signal.candidate);
         else pcWrapper.candidates.push(signal.candidate);
       }
-    };
-
-    socket.on('signal', signalHandler);
+    });
 
     return () => {
-      socket.off('signal', signalHandler);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
-  }, [peers, createPeerConnection]);
+  }, [user, createPeerConnection]);
 
   return (
     <PresenceContext.Provider value={{ peers, initiateFileTransfer, isConnected }}>
