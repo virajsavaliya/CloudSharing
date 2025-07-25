@@ -1,4 +1,4 @@
-const API_KEY = "AIzaSyD8PYtVh-zfDJ-em3b-EdJZ-bXi6v-TlcI";
+const API_KEY = "AIzaSyAkeATxRuVzdqQSEWa0w7SXMXzVgBAw9ks";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
 
 // Context from help page to train the model
