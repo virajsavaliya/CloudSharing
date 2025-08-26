@@ -38,4 +38,3 @@ coverage
 .vercel
 .DS_Store
 
-serviceAccountKey.json
