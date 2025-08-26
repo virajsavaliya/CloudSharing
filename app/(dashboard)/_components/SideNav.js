@@ -50,7 +50,7 @@ const saveUserToFirebase = async (user) => {
   }
 };
 
-function SideNav({ unreadChatCount = 0 }) {
+function SideNav({ unreadChatCount = 0, isExpanded }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -174,32 +174,44 @@ function SideNav({ unreadChatCount = 0 }) {
   };
 
   return (
-    <div className="shadow-lg border-r h-full flex-col justify-between rounded-2xl bg-gradient-to-b from-white via-blue-50 to-white hidden md:flex">
+    <div className="shadow-lg border-r h-full w-full flex-col justify-between rounded-2xl bg-gradient-to-b from-white via-blue-50 to-white hidden md:flex">
       <div>
-        <div className="p-4 py-2 border-b">
-          <Image src="/logo.svg" width={180} height={150} alt="Logo" />
+        {/* --- START OF LOGO CHANGE --- */}
+        <div className="p-4 py-2 border-b h-[72px] flex items-center justify-center">
+          {isExpanded ? (
+            // Replace '/logo-full.svg' with the path to your big logo
+            <Image src="/logo.svg" width={150} height={50} alt="Logo" />
+          ) : (
+            // Replace '/logo-icon.svg' with the path to your small logo
+            <Image src="/logo_icon.svg" width={40} height={40} alt="Logo Icon" />
+          )}
         </div>
-        <div className="flex flex-col float-left w-full">
+        {/* --- END OF LOGO CHANGE --- */}
+        <div className="flex flex-col float-left w-full mt-4">
           {menuList.map((item) => (
             <button
               key={item.id}
-              className={`flex gap-3 items-center p-4 px-7 transition-all duration-300 ease-in-out hover:bg-gray-200 text-gray-700 rounded-lg ${pathname === item.path ? "bg-blue-100 text-primary" : ""}`}
+              className={`flex gap-4 items-center p-4 transition-all duration-300 ease-in-out hover:bg-gray-200 text-gray-700 rounded-lg ${
+                pathname === item.path ? "bg-blue-100 text-primary" : ""
+              } ${isExpanded ? 'px-6' : 'justify-center'}`}
               onClick={() => handleNavigation(item.path)}
             >
-              <div className={`border border-transparent rounded-full p-1 ${pathname === item.path ? "border-blue-500" : ""} relative`}>
-                <item.icon className="menu-icon" />
+              <div className={`relative ${pathname === item.path ? "text-blue-600" : ""}`}>
+                <item.icon className="h-6 w-6" />
                 {item.name === "Chat" && unreadChatCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 shadow">
                     {unreadChatCount > 99 ? "99+" : unreadChatCount}
                   </span>
                 )}
               </div>
-              <h2 className="font-medium flex items-center gap-1">
-                {item.name}
-                {(item.name === "Meeting" || item.name === "Chat") && (
-                  <span className="text-[10px] font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 px-1.5 py-0.5 rounded uppercase tracking-wider">Beta</span>
-                )}
-              </h2>
+              {isExpanded && (
+                <h2 className="font-medium flex items-center gap-1 whitespace-nowrap">
+                  {item.name}
+                  {(item.name === "Meeting" || item.name === "Chat") && (
+                    <span className="text-[10px] font-bold text-white bg-gradient-to-r from-yellow-400 to-orange-500 px-1.5 py-0.5 rounded uppercase tracking-wider">Beta</span>
+                  )}
+                </h2>
+              )}
             </button>
           ))}
         </div>
@@ -207,12 +219,19 @@ function SideNav({ unreadChatCount = 0 }) {
       <div className="p-4 border-t bg-gradient-to-r from-white via-blue-50 to-white rounded-b-2xl">
         {user && (
           <div className="flex items-center gap-3 relative">
-            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setShowMenu((v) => !v)} tabIndex={0} onBlur={() => setTimeout(() => setShowMenu(false), 200)} style={{ minWidth: 0 }}>
+            <div 
+              className={`flex items-center gap-2 cursor-pointer group w-full ${!isExpanded && 'justify-center'}`} 
+              onClick={() => setShowMenu((v) => !v)} tabIndex={0} onBlur={() => setTimeout(() => setShowMenu(false), 200)}
+            >
               <ProfileAvatar user={user} size={32} />
-              <span className="text-gray-900 font-semibold transition-all duration-200 truncate font-sans" style={{ maxWidth: 110, minWidth: 0, fontSize: "1rem", lineHeight: "1.2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 600, letterSpacing: "0.01em", display: "block", fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif" }} title={user.displayName || user.email}>
-                {user.displayName || user.email}
-              </span>
-              <svg className="w-5 h-5 ml-1 text-gray-400 group-hover:text-blue-500 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+              {isExpanded && (
+                <>
+                  <span className="text-gray-900 font-semibold transition-all duration-200 truncate font-sans text-sm" title={user.displayName || user.email}>
+                    {user.displayName || user.email}
+                  </span>
+                  <svg className="w-5 h-5 ml-auto text-gray-400 group-hover:text-blue-500 transition" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+                </>
+              )}
             </div>
             {showMenu && (
               <div className="absolute bottom-16 left-0 bg-white border rounded-xl shadow-xl z-50 min-w-[210px] animate-fade-in flex flex-col">

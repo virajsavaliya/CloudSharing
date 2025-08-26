@@ -1,734 +1,354 @@
+// app/(dashboard)/(router)/chat/page.js
 "use client";
-import { useEffect, useState, useRef, useCallback, memo } from "react";
-import EmojiPicker from "emoji-picker-react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../../../_utils/FirebaseAuthContext";
 import { db } from "../../../../firebaseConfig";
-import { doc, getDoc, getDocs, collection, setDoc, onSnapshot, query, orderBy, getDocs as getDocsFirestore, updateDoc, arrayUnion, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import Image from "next/image";
-// Import components from _components
+import { AblyProvider, ChannelProvider, useAbly } from 'ably/react';
+import * as Ably from 'ably';
+import Link from "next/link";
+// --- Start of New Code ---
+import { useRouter, usePathname } from "next/navigation"; // Import navigation hooks
+// --- End of New Code ---
+
 import Sidebar from "./_components/Sidebar";
-import ChatHeader from "./_components/ChatHeader";
-import ChatMessages from "./_components/ChatMessages";
-import ChatInput from "./_components/ChatInput";
+import ChatRoom from "./_components/ChatRoom";
 import AddIdModal from "./_components/AddIdModal";
 import Toast from "./_components/Toast";
+import { useChatList } from "./hooks/useChatList";
 
-// Ensure user has a unique chatId in Firestore
-async function ensureChatId(user) {
-  if (!user) return null;
-  const userRef = doc(db, "users", user.uid); // <-- use user.uid
-  let userSnap = await getDoc(userRef);
-  let data = userSnap.exists() ? userSnap.data() : {};
-  if (data.chatId) {
-    return data.chatId;
+async function setupUserChatProfile(user) {
+  if (!user?.uid) return null;
+  const userRef = doc(db, "users", user.uid);
+  const userSnap = await getDoc(userRef);
+
+  if (userSnap.exists() && userSnap.data().chatId) {
+    return userSnap.data().chatId;
   }
-  // Generate a user-friendly chatId: username + random 3-digit number
-  let base = (user.displayName || user.email || "user").split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-  if (base.length > 10) base = base.slice(0, 10);
-  const randomNum = Math.floor(100 + Math.random() * 900); // 3-digit number
-  const newChatId = `${base}${randomNum}`;
-  await setDoc(userRef, { chatId: newChatId }, { merge: true });
-  // Re-fetch to ensure it's stored
-  userSnap = await getDoc(userRef);
-  data = userSnap.exists() ? userSnap.data() : {};
-  return data.chatId || newChatId;
+  const base = (user.displayName || user.email.split("@")[0]).replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+  const newChatId = `${base}${Math.floor(100 + Math.random() * 900)}`;
+  await setDoc(userRef, {
+    chatId: newChatId,
+    displayName: user.displayName || null,
+    email: user.email || null,
+    photoURL: user.photoURL || null,
+    uid: user.uid
+  }, { merge: true });
+  return newChatId;
 }
 
-// Memoized UserAvatar for performance
-const UserAvatar = memo(function UserAvatar({ user, size = 40, fallbackBg = "bg-blue-100", fallbackTextColor = "text-blue-700", fallback = "U" }) {
-  if (user?.photoURL) {
-    return (
-      <Image
-        src={user.photoURL}
-        alt={user.displayName || user.email || "User"}
-        width={size}
-        height={size}
-        className="rounded-full object-cover shadow-sm"
-        style={{ width: size, height: size, minWidth: size, minHeight: size }}
-      />
-    );
-  }
-  const text = user?.displayName
-    ? user.displayName[0].toUpperCase()
-    : (user?.email ? user.email[0].toUpperCase() : fallback);
-  return (
-    <div
-      className={`${fallbackBg} flex items-center justify-center font-bold ${fallbackTextColor} rounded-full shadow-sm`}
-      style={{ width: size, height: size, minWidth: size, minHeight: size, fontSize: size * 0.5 }}
-    >
-      {text}
-    </div>
-  );
-});
+const GlobalMessageListener = ({ myChatId, chatHistory, addUserToHistory, setToastMessage }) => {
+    const ablyClient = useAbly();
 
-function ChatPage() {
-  const { user } = useAuth();
-  const [chatId, setChatId] = useState(null);
+    useEffect(() => {
+        if (!myChatId) return;
+
+        const channel = ablyClient.channels.get(`private-${myChatId}`);
+        
+        const listener = async (message) => {
+            const senderId = message.data.from;
+            const messageBody = message.data.message;
+            const isAlreadyInHistory = chatHistory.some(user => user.chatId === senderId);
+            
+            if (!isAlreadyInHistory && senderId) {
+                try {
+                    const response = await fetch(`/api/find-user?chatId=${senderId}`);
+                    const data = await response.json();
+                    if (response.ok && data.user) {
+                        const senderProfile = data.user;
+                        addUserToHistory(senderProfile);
+                        setToastMessage(`New message from ${senderProfile.displayName || senderId}`);
+
+                        if (document.hidden && Notification.permission === 'granted') {
+                            const notification = new Notification(`New message from ${senderProfile.displayName || senderId}`, {
+                                body: messageBody,
+                                icon: senderProfile.photoURL || '/logo.svg'
+                            });
+                            notification.onclick = () => window.focus();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch new user profile:', error);
+                }
+            } else if (senderId) {
+                const senderProfile = chatHistory.find(user => user.chatId === senderId);
+                if (document.hidden && Notification.permission === 'granted' && senderProfile) {
+                     const notification = new Notification(`New message from ${senderProfile.displayName || senderId}`, {
+                        body: messageBody,
+                        icon: senderProfile.photoURL || '/logo.svg'
+                    });
+                    notification.onclick = () => window.focus();
+                }
+            }
+        };
+
+        channel.subscribe('new-message-ping', listener);
+
+        return () => {
+            channel.unsubscribe('new-message-ping', listener);
+        };
+    }, [myChatId, ablyClient, chatHistory, addUserToHistory, setToastMessage]);
+
+    return null;
+};
+
+
+function ChatInterface({ user, myChatId }) {
   const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [otherId, setOtherId] = useState("");
-  const [idError, setIdError] = useState("");
-  const [chatHistory, setChatHistory] = useState([]); // [{chatId, displayName, email}]
-  const [unreadCounts, setUnreadCounts] = useState({}); // {chatId: count}
-  const messagesEndRef = useRef(null);
-  const [copied, setCopied] = useState(false);
+  const { chatHistory, addUserToHistory, removeConversation } = useChatList(myChatId);
+  const [toastMessage, setToastMessage] = useState(null);
   const [showAddId, setShowAddId] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const inputRef = useRef(); // <-- add this line
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
-  // Sidebar (chat list) visibility for mobile
-  const [showSidebar, setShowSidebar] = useState(true);
-
-  // When a chat is selected on mobile, hide sidebar
   useEffect(() => {
-    if (isMobile && selectedUser) setShowSidebar(false);
-    if (isMobile && !selectedUser) setShowSidebar(true);
-  }, [isMobile, selectedUser]);
-
-  // Ensure chatId on mount
-  useEffect(() => {
-    if (user) {
-      ensureChatId(user).then(setChatId);
+    if (!("Notification" in window)) {
+      console.log("This browser does not support desktop notification");
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission();
     }
-  }, [user]);
+  }, []);
 
-  // Load chat history from localStorage and Firestore (merge both)
-  useEffect(() => {
-    if (!chatId) return;
-    const history = localStorage.getItem(`chatHistory_${chatId}`);
-    let localHistory = [];
-    if (history) {
-      localHistory = JSON.parse(history);
-      setChatHistory(localHistory);
-    }
-    // --- NEW: Merge Firestore chatHistory (if present) ---
-    const fetchFirestoreHistory = async () => {
-      const userRef = doc(db, "users", chatId);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (Array.isArray(data.chatHistory)) {
-          // Merge unique users from Firestore chatHistory
-          const merged = [
-            ...data.chatHistory,
-            ...localHistory.filter(
-              lh => !data.chatHistory.some(fh => fh.chatId === lh.chatId)
-            ),
-          ];
-          setChatHistory(merged);
-          localStorage.setItem(`chatHistory_${chatId}`, JSON.stringify(merged));
-        }
-      }
-    };
-    fetchFirestoreHistory();
-  }, [chatId]);
 
-  // Save chat history to localStorage
-  const saveChatHistory = (history) => {
-    if (!chatId) return;
-    setChatHistory(history);
-    localStorage.setItem(`chatHistory_${chatId}`, JSON.stringify(history));
-  };
-
-  // Add user to chat history if not present
-  const addToChatHistory = (userObj) => {
-    if (!userObj || !userObj.chatId || userObj.chatId === chatId) return;
-    const exists = chatHistory.some((u) => u.chatId === userObj.chatId);
-    if (!exists) {
-      const newHistory = [
-        {
-          chatId: userObj.chatId,
-          displayName: userObj.displayName,
-          email: userObj.email,
-          photoURL: userObj.photoURL || null, // store photoURL
-        },
-        ...chatHistory,
-      ];
-      saveChatHistory(newHistory);
-    }
-  };
-
-  // Track if user is at bottom of chat (for scroll control)
-  const [isAtBottom, setIsAtBottom] = useState(true);
-
-  // Handler to update isAtBottom when user scrolls
-  const scrollTimeout = useRef();
-  const handleChatScroll = (e) => {
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-    scrollTimeout.current = setTimeout(() => {
-      const { scrollTop, scrollHeight, clientHeight } = e.target;
-      setIsAtBottom(scrollHeight - scrollTop - clientHeight < 120);
-    }, 50);
-  };
-
-  // Add error state for chat API errors
-  const [chatApiError, setChatApiError] = useState("");
-
-  // --- Firebase real-time chat listener ---
-  useEffect(() => {
-    if (!chatId || !selectedUser) return;
-    setChatApiError(""); // reset error before fetch
-
-    // Assume messages are stored in a collection: chats/{chatId1_chatId2}/messages
-    // Sort chatId1 and chatId2 lexicographically to ensure unique path
-    const chatKey = [chatId, selectedUser.chatId].sort().join("_");
-    const messagesRef = collection(db, "chats", chatKey, "messages");
-    const q = query(messagesRef, orderBy("timestamp", "asc"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = [];
-      snapshot.forEach(doc => {
-        msgs.push(doc.data());
-      });
-      setMessages(msgs);
-      setChatApiError(""); // clear error if successful
-    }, (err) => {
-      setChatApiError("Failed to load messages.");
-      setMessages([]);
-    });
-
-    return () => unsubscribe();
-    // eslint-disable-next-line
-  }, [chatId, selectedUser]);
-
-  // Scroll to bottom on new message, but only if user is at the bottom
-  useEffect(() => {
-    if (!messagesEndRef.current) return;
-    if (isAtBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isAtBottom]);
-
-  // Send message: write to Firestore
-  const sendMessage = async () => {
-    if (!input.trim() || !selectedUser) return;
-    // Get sender info (including photoURL)
-    let senderInfo = user;
-    if (!senderInfo || !senderInfo.displayName || !senderInfo.photoURL) {
-      const senderDoc = await getDoc(doc(db, "users", user.uid));
-      if (senderDoc.exists()) {
-        senderInfo = { ...senderDoc.data(), ...senderInfo };
-      }
-    }
-    const msg = {
-      senderId: chatId,
-      receiverId: selectedUser.chatId,
-      message: input,
-      timestamp: new Date().toISOString(),
-      senderPhotoURL: senderInfo.photoURL || null, // <-- add this line
-      senderDisplayName: senderInfo.displayName || senderInfo.email || "", // optional
-    };
-    setInput("");
-    // Write to Firestore
-    const chatKey = [chatId, selectedUser.chatId].sort().join("_");
-    const messagesRef = collection(db, "chats", chatKey, "messages");
-    await setDoc(doc(messagesRef), msg);
-    addToChatHistory(selectedUser);
-
-    // --- Add receiver to sender's chatHistory in Firestore if not present ---
-    try {
-      const userRef = doc(db, "users", user.uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const chatHistory = data.chatHistory || [];
-        const alreadyExists = chatHistory.some(u => u.chatId === selectedUser.chatId);
-        if (!alreadyExists) {
-          const newEntry = {
-            chatId: selectedUser.chatId,
-            displayName: selectedUser.displayName || selectedUser.email || "",
-            email: selectedUser.email || "",
-            photoURL: selectedUser.photoURL || null,
-          };
-          await updateDoc(userRef, {
-            chatHistory: arrayUnion(newEntry)
-          });
-        }
-      }
-    } catch (e) {
-      // ignore error
-    }
-
-    // No need to manually fetch messages, listener will update
-  };
-
-  // Handle connect by chatId
-  const handleConnectById = async () => {
-    setIdError("");
-    if (!otherId.trim()) return;
-    if (otherId === chatId) {
-      setIdError("You cannot chat with yourself.");
+  const handleConnectAndSend = (foundUser) => {
+    if (!foundUser || foundUser.chatId === myChatId) {
+      setToastMessage("Invalid user or cannot chat with yourself.");
       return;
     }
-    // Try to find user by chatId
-    const snap = await getDocs(collection(db, "users"));
-    const found = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .find((u) => u.chatId === otherId);
-    if (found) {
-      setSelectedUser(found);
-      setIdError("");
-      addToChatHistory(found);
-    } else {
-      setIdError("No user found with this ID.");
-    }
+    addUserToHistory(foundUser);
+    setSelectedUser(foundUser);
+    setShowAddId(false);
+    setToastMessage(`Conversation with ${foundUser.displayName || foundUser.chatId} started!`);
   };
 
-  // Helper to get latest user info from Firestore by chatId
-  const getUserByChatId = async (chatId) => {
-    // Find user by chatId field, not document ID
-    const snap = await getDocs(collection(db, "users"));
-    return snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .find((u) => u.chatId === chatId);
-  };
+  const handleDeleteConversation = async (chatIdToDelete) => {
+    if (!window.confirm("Are you sure you want to permanently delete this user and the entire conversation? This action cannot be undone.")) return;
 
-  // When selecting from chat history, always fetch latest info (including photoURL)
-  const handleSelectHistoryUser = async (historyUser) => {
-    if (!historyUser || !historyUser.chatId) return;
-    const found = await getUserByChatId(historyUser.chatId);
-    if (found) {
-      setSelectedUser(found);
-      setIdError("");
-      addToChatHistory(found);
-    } else {
-      setSelectedUser(historyUser);
-      setIdError("");
-    }
-  };
-
-  // Helper: update last read timestamp in Firestore
-  const updateLastRead = async (myChatId, otherChatId) => {
-    if (!myChatId || !otherChatId) return;
-    const chatKey = [myChatId, otherChatId].sort().join("_");
-    const lastReadRef = doc(db, "chats", chatKey, "lastRead", myChatId);
-    await setDoc(lastReadRef, { timestamp: new Date().toISOString() }, { merge: true });
-  };
-
-  // --- Unread message count using Firestore ---
-  useEffect(() => {
-    if (!chatId || chatHistory.length === 0) return;
-
-    let unsubscribes = [];
-
-    chatHistory.forEach((chat) => {
-      if (!chat.chatId) return;
-
-      if (selectedUser?.chatId === chat.chatId) {
-        if (unreadCounts[chat.chatId] !== 0) {
-            setUnreadCounts(prev => ({ ...prev, [chat.chatId]: 0 }));
-        }
-        return;
-      }
-
-      const chatKey = [chatId, chat.chatId].sort().join("_");
-      const messagesRef = collection(db, "chats", chatKey, "messages");
-      const lastReadRef = doc(db, "chats", chatKey, "lastRead", chatId);
-
-      // Listen for lastRead timestamp
-      let lastReadTs = null;
-      const unsubLastRead = onSnapshot(lastReadRef, (snap) => {
-        lastReadTs = snap.exists() ? snap.data().timestamp : null;
-        // Listen for messages
-        const unsubMsgs = onSnapshot(messagesRef, (snapshot) => {
-          let unread = 0;
-          snapshot.forEach(docSnap => {
-            const msg = docSnap.data();
-            if (
-              msg.senderId === chat.chatId &&
-              (!lastReadTs || new Date(msg.timestamp) > new Date(lastReadTs))
-            ) {
-              unread++;
-            }
-          });
-          setUnreadCounts(prev => ({ ...prev, [chat.chatId]: unread }));
-        });
-        unsubscribes.push(unsubMsgs);
-      });
-      unsubscribes.push(unsubLastRead);
-    });
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub && unsub());
-    };
-    // eslint-disable-next-line
-  }, [chatId, chatHistory, selectedUser]);
-
-  // --- Mark messages as read when opening a chat (update Firestore) ---
-  useEffect(() => {
-    if (!chatId || !selectedUser) return;
-    updateLastRead(chatId, selectedUser.chatId);
-    setUnreadCounts((prev) => ({ ...prev, [selectedUser.chatId]: 0 }));
-    // eslint-disable-next-line
-  }, [chatId, selectedUser]);
-
-  // --- Place ALL hooks at the top level, before any early return! ---
-  const syncChatsFromFirestore = useCallback(async () => {
-    if (!chatId) return;
-    // Get all chat collections under "chats"
-    const chatsSnap = await getDocsFirestore(collection(db, "chats"));
-    const chatKeys = chatsSnap.docs.map(docSnap => docSnap.id);
-    let newUsers = [];
-    for (const key of chatKeys) {
-      if (!key.includes(chatId)) continue;
-      const ids = key.split("_");
-      const otherId = ids[0] === chatId ? ids[1] : ids[0];
-      if (otherId === chatId) continue;
-      // If not already in chatHistory, add
-      if (!chatHistory.some(u => u.chatId === otherId)) {
-        // Fetch user info
-        const usersSnap = await getDocsFirestore(collection(db, "users"));
-        const found = usersSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .find((u) => u.chatId === otherId);
-        if (found) {
-          newUsers.push({
-            chatId: found.chatId,
-            displayName: found.displayName,
-            email: found.email,
-            photoURL: found.photoURL || null,
-          });
-        }
-      }
-    }
-    if (newUsers.length > 0) {
-      // Add new users to chatHistory and save
-      const newHistory = [...newUsers, ...chatHistory];
-      setChatHistory(newHistory);
-      localStorage.setItem(`chatHistory_${chatId}`, JSON.stringify(newHistory));
-    }
-  }, [chatId, chatHistory]);
-
-  // On chatId or chatHistory change, sync chats from Firestore
-  useEffect(() => {
-    syncChatsFromFirestore();
-    // eslint-disable-next-line
-  }, [chatId]);
-
-  // --- DO NOT put any early return before all hooks! ---
-  const [toast, setToast] = useState(null);
-  useEffect(() => {
-    if (chatApiError) {
-      setToast(chatApiError);
-      setTimeout(() => setToast(null), 2500);
-    }
-  }, [chatApiError]);
-
-  // Move this block AFTER all hooks:
-  if (!user || !chatId) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Image
-          src="/loader.gif"
-          alt="Loading..."
-          width={350}
-          height={350}
-          className="w-100 h-100"
-        />
-      </div>
-    );
-  }
-
-  // Add this function before your component return
-  const handleDeleteHistoryUser = (chatIdToDelete) => {
-    const newHistory = chatHistory.filter(u => u.chatId !== chatIdToDelete);
-    saveChatHistory(newHistory);
-    setUnreadCounts(prev => {
-      const copy = { ...prev };
-      delete copy[chatIdToDelete];
-      return copy;
-    });
-    if (selectedUser?.chatId === chatIdToDelete) setSelectedUser(null);
-  };
-
-  // Add this function before your component return (if not already present)
-  const handleDeleteChatWithUser = async (otherChatId) => {
-    if (!chatId || !otherChatId) return;
-    if (!window.confirm("Are you sure you want to delete all chat messages with this user? This cannot be undone.")) return;
+    const fullChatId = [myChatId, chatIdToDelete].sort().join('_');
+    
     try {
-      // Try deleting chat messages from Firestore directly (client-side fallback)
-      const chatKey = [chatId, otherChatId].sort().join("_");
-      // Delete all messages in chats/{chatKey}/messages
-      const messagesRef = collection(db, "chats", chatKey, "messages");
-      const messagesSnap = await getDocs(messagesRef);
-      const batchDeletes = [];
-      messagesSnap.forEach(docSnap => {
-        batchDeletes.push(deleteDoc(docSnap.ref));
-      });
-      await Promise.all(batchDeletes);
+        const response = await fetch(`/api/chat/conversation?chatId=${fullChatId}`, {
+            method: 'DELETE',
+        });
 
-      // Optionally, delete lastRead docs
-      const lastReadRef1 = doc(db, "chats", chatKey, "lastRead", chatId);
-      const lastReadRef2 = doc(db, "chats", chatKey, "lastRead", otherChatId);
-      await Promise.all([deleteDoc(lastReadRef1), deleteDoc(lastReadRef2)]);
+        if (!response.ok) {
+            throw new Error("Failed to delete conversation on the server.");
+        }
 
-      if (selectedUser?.chatId === otherChatId) setMessages([]);
-      setUnreadCounts(prev => {
-        const copy = { ...prev };
-        delete copy[otherChatId];
-        return copy;
-      });
-      const newHistory = chatHistory.filter(u => u.chatId !== otherChatId);
-      saveChatHistory(newHistory);
-      if (selectedUser?.chatId === otherChatId) setSelectedUser(null);
-    } catch (e) {
-      setToast("Failed to delete chat messages.");
+        removeConversation(chatIdToDelete);
+
+        if (selectedUser?.chatId === chatIdToDelete) {
+            setSelectedUser(null);
+        }
+        setToastMessage("Conversation deleted.");
+    } catch (error) {
+        console.error("Error deleting conversation:", error);
+        setToastMessage("Could not delete conversation.");
     }
   };
 
-  // Define handleCopyChatId here
-  const handleCopyChatId = () => {
-    if (chatId) {
-      navigator.clipboard.writeText(chatId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+  const handleClearMessages = async (chatIdToClear) => {
+    if (!window.confirm("Are you sure you want to clear all messages in this conversation? This will not delete the user from your list.")) return;
+    
+    const fullChatId = [myChatId, chatIdToClear].sort().join('_');
+
+    try {
+        const response = await fetch(`/api/chat/messages?chatId=${fullChatId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to clear messages on the server.");
+        }
+
+        if (selectedUser?.chatId === chatIdToClear) {
+            const currentUser = selectedUser;
+            setSelectedUser(null);
+            setTimeout(() => setSelectedUser(currentUser), 0);
+        }
+        setToastMessage("Messages cleared successfully.");
+    } catch(error) {
+        console.error("Error clearing messages:", error);
+        setToastMessage("Could not clear messages.");
     }
   };
+
+  const channelName = selectedUser ? [myChatId, selectedUser.chatId].sort().join('_') : null;
 
   return (
-    <div
-      className="w-full h-screen flex bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden font-sans"
-      aria-label="Chat Application"
-      tabIndex={0}
-      style={{
-        ...(isMobile && showSidebar
-          ? { position: "fixed", width: "100vw", height: "100vh", overflow: "hidden" }
-          : {}),
-        ...(isMobile && !showSidebar
-          ? { position: "fixed", width: "100vw", height: "100vh", overflow: "hidden" }
-          : {}),
-      }}
-    >
-      <Toast toast={toast} />
-      <Sidebar
-        chatId={chatId}
-        chatHistory={chatHistory}
-        selectedUser={selectedUser}
-        setSelectedUser={setSelectedUser}
-        unreadCounts={unreadCounts}
-        handleCopyChatId={handleCopyChatId}
-        copied={copied}
-        handleDeleteHistoryUser={handleDeleteHistoryUser}
-        handleDeleteChatWithUser={handleDeleteChatWithUser}
-        showSidebar={showSidebar}
-        setShowSidebar={setShowSidebar}
-        showAddId={showAddId}
-        setShowAddId={setShowAddId}
-        otherId={otherId}
-        setOtherId={setOtherId}
-        handleConnectById={handleConnectById}
-        idError={idError}
-        isMobile={isMobile}
+    <div className="flex h-full w-full bg-white rounded-lg shadow-md overflow-hidden border">
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      
+      <GlobalMessageListener 
+        myChatId={myChatId} 
+        chatHistory={chatHistory} 
+        addUserToHistory={addUserToHistory}
+        setToastMessage={setToastMessage}
       />
-      <main
-        className={`
-          flex-1 flex flex-col h-full relative bg-gradient-to-br from-blue-100 to-blue-200
-          ${isMobile && showSidebar ? "hidden" : ""}
-          ${isMobile ? "fixed left-0 right-0 top-0 z-30 w-full h-full" : ""}
-        `}
-        style={{
-          ...(isMobile
-            ? {
-              height: "100vh",
-              maxHeight: "100vh",
-              minHeight: "100vh",
-              padding: "0px",
-              borderRadius: "0px",
-              overflow: "hidden",
-            }
-            : {
-              height: "100vh",
-              maxHeight: "100vh",
-            }),
-        }}
-        aria-label="Chat Area"
-        tabIndex={0}
-      >
-        {/* Fix: Add extra top padding for mobile so ChatHeader is not overlapped */}
-        <div style={{
-          paddingTop: isMobile ? "64px" : "0px",
-          position: "relative",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-        }}>
-          <ChatHeader
-            selectedUser={selectedUser}
-            isMobile={isMobile}
-            setSelectedUser={setSelectedUser}
-            setShowSidebar={setShowSidebar}
-          />
-          <div
-            className={`flex-1 flex flex-col justify-end overflow-y-auto`}
-            style={{
-              minHeight: 0,
-              maxHeight: "100%",
-              overflowY: "auto",
-              WebkitOverflowScrolling: "touch",
-              flexGrow: 1,
-              flexShrink: 1,
-              display: "flex",
-              flexDirection: "column",
-              padding: isMobile ? "8px 0px" : "16px 32px",
-            }}
-          >
-            <ChatMessages
-              chatApiError={chatApiError}
+
+      <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} w-full md:w-auto`}>
+        <Sidebar
+          myChatId={myChatId}
+          chatHistory={chatHistory}
+          selectedUser={selectedUser}
+          setSelectedUser={setSelectedUser}
+          setShowAddId={setShowAddId}
+          setToastMessage={setToastMessage}
+        />
+      </div>
+
+      <div className={`flex-1 ${!selectedUser ? 'hidden md:flex' : 'flex'}`}>
+        {selectedUser && channelName ? (
+          <ChannelProvider channelName={channelName}>
+            <ChatRoom
+              myChatId={myChatId}
               selectedUser={selectedUser}
-              messages={messages}
-              chatId={chatId}
-              user={user}
-              messagesEndRef={messagesEndRef}
-              handleChatScroll={handleChatScroll}
+              setSelectedUser={setSelectedUser}
+              handleClearMessages={handleClearMessages}
+              handleDeleteConversation={handleDeleteConversation}
             />
-          </div>
-          <div
-            style={{
-              width: "100%",
-              position: "sticky",
-              bottom: 0,
-              zIndex: 20,
-              background: isMobile ? "rgba(255,255,255,0.98)" : "rgba(255,255,255,0.90)",
-              borderTop: "1px solid #e5e7eb",
-              padding: isMobile ? "8px 0px" : "16px 32px",
-              boxShadow: isMobile ? "0 -2px 8px rgba(0,0,0,0.04)" : undefined,
-            }}
-          >
-            <ChatInput
-              selectedUser={selectedUser}
-              input={input}
-              setInput={setInput}
-              sendMessage={sendMessage}
-              showEmojiPicker={showEmojiPicker}
-              setShowEmojiPicker={setShowEmojiPicker}
-              inputRef={inputRef}
-            />
+          </ChannelProvider>
+        ) : (
+          <main className="hidden md:flex flex-1 flex-col items-center justify-center text-center text-gray-500 bg-white h-full">
+            <Image src="/logo.svg" width={150} height={100} alt="Logo" className="mb-4" />
+            <p className="text-lg font-semibold">Welcome to your Secure Chat</p>
+            <p>Select a conversation or add a new user to begin.</p>
+          </main>
+        )}
+      </div>
+
+      <AddIdModal
+        show={showAddId}
+        onClose={() => setShowAddId(false)}
+        onConnectAndSend={handleConnectAndSend}
+        myChatId={myChatId}
+      />
+    </div>
+  );
+}
+// NavLocation Component
+const NavLocation = () => {
+  return (
+    <div className="md:block pb-4">
+      <nav aria-label="Breadcrumb">
+        <ol className="flex items-center gap-1 text-sm text-gray-600">
+          <li>
+            <Link href="/" className="block transition hover:text-gray-700">
+              <span className="sr-only"> Home </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+            </Link>
+          </li>
+          <li className="rtl:rotate-180">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </li>
+          <li>
+            <Link
+              href="/chat"
+              className="block transition hover:text-gray-700"
+            >
+              {" "}
+              Chat{" "}
+            </Link>
+          </li>
+        </ol>
+      </nav>
+    </div>
+  );
+};
+
+export default function Page() {
+  const { user, loading: authLoading } = useAuth();
+  const [myChatId, setMyChatId] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  // --- Start of New Code ---
+  const router = useRouter();
+  const pathname = usePathname();
+  // --- End of New Code ---
+
+  useEffect(() => {
+    // If auth is done loading and there is a user, setup their profile.
+    if (!authLoading && user) {
+      setIsProfileLoading(true);
+      setupUserChatProfile(user)
+        .then(setMyChatId)
+        .finally(() => setIsProfileLoading(false));
+    } 
+    // **THE FIX IS HERE**: If auth is done loading and there is NO user, redirect to login.
+    else if (!authLoading && !user) {
+      router.push(`/login?redirect_url=${encodeURIComponent(pathname)}`);
+    }
+  }, [user, authLoading, router, pathname]);
+
+  const ablyClient = useMemo(() => {
+    if (myChatId) {
+      return new Ably.Realtime({ authUrl: `/api/ably-token?clientId=${myChatId}` });
+    }
+    return null;
+  }, [myChatId]);
+
+  // The loading skeleton will show while auth is loading or the user is being redirected.
+  if (authLoading || isProfileLoading || !ablyClient) {
+  return (
+    <div className="p-4 md:p-6 w-full h-[calc(100vh-65px)] bg-gray-50">
+      <NavLocation />
+
+      <div className="flex h-full border rounded-lg overflow-hidden shadow-sm">
+        <div className="hidden md:flex flex-col w-80 lg:w-96 bg-white border-r animate-pulse">
+          <div className="p-4 border-b h-28 bg-gray-200"></div>
+          <div className="p-4 border-b h-24 bg-gray-200"></div>
+          <div className="flex-1 space-y-3 p-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            ))}
           </div>
         </div>
-        {isMobile && !showSidebar && !selectedUser && (
-          <button
-            className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center text-3xl shadow-lg z-50"
-            onClick={() => setShowSidebar(true)}
-            aria-label="Show chat list"
-            title="Show chat list"
-            style={{
-              width: 56,
-              height: 56,
-              fontSize: 32,
-              borderRadius: "50%",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-            }}
-          >
-            <span>☰</span>
-          </button>
-        )}
-      </main>
-      <AddIdModal
-        showAddId={showAddId}
-        setShowAddId={setShowAddId}
-        otherId={otherId}
-        setOtherId={setOtherId}
-        handleConnectById={handleConnectById}
-        idError={idError}
-        setIdError={setIdError} // <-- add this line
-      />
-      {/* Modern style tweaks */}
-      <style jsx>{`
-        @media (max-width: 767px) {
-          .w-[340px] {
-            width: 100vw !important;
-          }
-          aside {
-            min-width: 0 !important;
-            max-width: 100vw !important;
-            border-radius: 0 !important;
-          }
-          main {
-            border-radius: 0 !important;
-            padding: 0 !important;
-            top: 0 !important;
-          }
-          .chat-bubble-user {
-            background: linear-gradient(90deg, #2563eb 60%, #60a5fa 100%);
-            color: #fff;
-            border-radius: 18px 18px 4px 18px;
-            font-size: 15px;
-            padding: 10px 14px;
-            margin-bottom: 2px;
-            word-break: break-word;
-          }
-          .chat-bubble-bot {
-            background: #fff;
-            color: #222;
-            border-radius: 18px 18px 18px 4px;
-            font-size: 15px;
-            padding: 10px 14px;
-            margin-bottom: 2px;
-            word-break: break-word;
-            border: 1px solid #e5e7eb;
-          }
-          .faq-section {
-            padding: 0;
-          }
-          .faq-title {
-            font-size: 15px;
-            margin-bottom: 6px;
-          }
-          .faq-button {
-            font-size: 14px;
-            padding: 8px 10px;
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95);}
-          to { opacity: 1; transform: scale(1);}
-        }
-        aside, main {
-          transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
-        }
-        /* Tooltip styles */
-        [title] {
-          position: relative;
-        }
-        [title]:hover::after {
-          content: attr(title);
-          position: absolute;
-          left: 100%;
-          top: 50%;
-          transform: translateY(-50%);
-          background: #222;
-          color: #fff;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          white-space: nowrap;
-          z-index: 100;
-        }
-      `}</style>
+        <div className="flex-1 flex flex-col bg-white animate-pulse">
+          <div className="h-[73px] border-b bg-gray-200"></div>
+          <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className={`w-${i % 2 === 0 ? "3/4" : "1/2"} h-8 bg-gray-200 rounded ${i % 2 !== 0 && 'ml-auto'}`}
+              ></div>
+            ))}
+          </div>
+          <div className="h-[73px] border-t bg-gray-200"></div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// Helper icon for time
-function ClockIcon() {
-  return <svg className="w-3 h-3 inline-block mr-1 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
+  // If the user is logged in and everything is loaded, show the chat interface.
+  return (
+    <div className="p-4 md:p-6 w-full h-[calc(100vh-65px)]">
+      <NavLocation />
+      <AblyProvider client={ablyClient}>
+        <ChatInterface user={user} myChatId={myChatId} />
+      </AblyProvider>
+    </div>
+  );
 }
-
-// Add these helper functions above all components so they are available everywhere
-function shortId(id) {
-  if (!id) return "";
-  if (id.length <= 12) return id;
-  return id.slice(0, 6) + "..." + id.slice(-4);
-}
-
-function shortName(name, maxLen = 18) {
-  if (!name) return "";
-  return name.length > maxLen ? name.slice(0, maxLen - 3) + "..." : name;
-}
-
-export default ChatPage;

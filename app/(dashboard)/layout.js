@@ -7,33 +7,44 @@ import Footer from '../_components/FooterWeb';
 
 function Layout({ children }) {
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsSmallScreen(window.innerWidth <= 768); // Adjust the threshold as needed
+      setIsSmallScreen(window.innerWidth <= 768);
     };
 
-    handleResize(); // Call once on initial render to set the initial state
-    window.addEventListener('resize', handleResize); // Add event listener for window resize
+    handleResize();
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize); // Clean up event listener
+      window.removeEventListener('resize', handleResize);
     };
-  }, []); // Empty dependency array to run the effect only once on initial render
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div className='h-full md:w-64 flex-col fixed inset-y-0 z-50 md:flex hidden'>
-        <SideNav/>
+      <div 
+        // Changed 'transition-all' to 'transition-[width]' for a smoother, more specific animation
+        className={`h-full flex-col fixed inset-y-0 z-50 md:flex hidden transition-[width] duration-300 ease-in-out ${
+          isExpanded ? 'md:w-64' : 'md:w-20'
+        }`}
+        onMouseEnter={() => setIsExpanded(true)}
+        onMouseLeave={() => setIsExpanded(false)}
+      >
+        <SideNav isExpanded={isExpanded}/>
       </div>
+
       <div
-        className='md:ml-64'
+        // Changed 'transition-all' to 'transition-[margin-left]'
+        className={`transition-[margin-left] duration-300 ease-in-out ${
+          isExpanded ? 'md:ml-64' : 'md:ml-20'
+        }`}
         style={{
           flex: '1',
-          paddingTop: '64px', // Add enough top padding for mobile header
+          paddingTop: '64px',
         }}
       >
-        {/* On desktop, remove the padding */}
         <style jsx>{`
           @media (min-width: 768px) {
             div[style*="padding-top"] {
@@ -44,7 +55,7 @@ function Layout({ children }) {
         <TopHeader />
         {children}
       </div>
-      {isSmallScreen && <Footer />} {/* Render footer only on small screens */}
+      {isSmallScreen && <Footer />}
     </div>
   );
 }
