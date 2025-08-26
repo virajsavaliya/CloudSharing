@@ -2,12 +2,12 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ## Getting Started
 
-First, run the development server:
+First, run the development server:m
 
 ```bash
 npm run dev
 # or
-yarn dev
+yarn deve
 # or
 pnpm dev
 # or
@@ -42,3 +42,6 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 [text](https://clerk.com/)
 [text](https://resend.com/)
 [text](https://vercel.com/)
+
+
+My project is cloudsharing. first is landing page when click on getstart button it will be redirect to login page where user can create or login account For user login use firebase auth. after login user redirect to upload page where user can multiple files multi type of files at same time it will be uploading in. firebase database. after uploading it will be redirect to sending option page like where show file sharing option in this page first is qr code (qr code is unique link which created to qr code) , unique link for sharing , email (sending mail using nodemailer) sending, local file share (where if user in same network so user can share file easy. and it use Ably for realtime sharing ). after this there is files page where show files history which send by user here data will be fetch from firebase database. in this page user can show file, resend file, delete file. after deletetion file can not direct delete it move to recycle bin page and from recycle user can recover and delete file. then upgrade page where there is buy plan and use can select and buy plan and get benifets. there is meeting page where user can arrange meeting using jitsi meet(with basic meeting id which other user add and join meet ). then chat page where user can chating each other like proper chating website where all chats store in firebase and also it use firebase realtime chating feture so it will make easy. after admin page where admin can control user role, show premium users, active user , non active user, storage. there is an chat bot with gemini api integration and chat bot fully trained based on website so it acurate answer to user and give help.

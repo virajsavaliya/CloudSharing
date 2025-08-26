@@ -29,7 +29,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, ".next/types/app/(dashboard)/(router)/chat/page.", ".next/types/app/(dashboard)/(router)/meeting/page"  ],
   "exclude": [
     "node_modules"
   ]
