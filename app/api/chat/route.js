@@ -1,22 +1,48 @@
-// app/(dashboard)/(router)/chat/api/route.js
 import { NextResponse } from 'next/server';
-import { adminDb } from '../../../lib/firebaseAdmin';
+import { adminDb, adminAuth } from '../../../lib/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const createChatId = (user1, user2) => [user1, user2].sort().join('_');
 
-// POST function remains the same...
+// POST: Send a new message with security checks
 export async function POST(req) {
     try {
-        const { senderId, receiverId, message } = await req.json();
-        if (!senderId || !receiverId || !message) {
-            return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+        const token = req.headers.get('Authorization')?.split('Bearer ')[1];
+        if (!token) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        const authenticatedUserUid = decodedToken.uid;
+
+        const { senderId, receiverId, message } = await req.json();
+
+        // **THE FIX IS HERE**: Changed userDoc.exists() to userDoc.exists
+        const userDoc = await adminDb.collection('users').doc(authenticatedUserUid).get();
+        if (!userDoc.exists || userDoc.data().chatId !== senderId) {
+             return NextResponse.json({ error: "Forbidden: Sender ID does not match authenticated user." }, { status: 403 });
+        }
+
+        if (!senderId || !receiverId || !message) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
         const chatId = createChatId(senderId, receiverId);
         const messagesCol = adminDb.collection("chats").doc(chatId).collection("messages");
-        await messagesCol.add({ senderId, message, timestamp: FieldValue.serverTimestamp() });
+        
+        await messagesCol.add({ 
+            senderId, 
+            message, 
+            timestamp: FieldValue.serverTimestamp() 
+        });
+        
         return NextResponse.json({ success: true }, { status: 201 });
+
     } catch (err) {
+        console.error("API POST Error:", err);
+        if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
         return NextResponse.json({ error: "Failed to save message" }, { status: 500 });
     }
 }
@@ -28,8 +54,8 @@ export async function GET(req) {
         const { searchParams } = new URL(req.url);
         const user1 = searchParams.get('user1');
         const user2 = searchParams.get('user2');
-        const cursor = searchParams.get('cursor'); // Timestamp of the oldest message
-        const limit = 25; // Number of messages to fetch per page
+        const cursor = searchParams.get('cursor');
+        const limit = 25;
 
         if (!user1 || !user2) return NextResponse.json({ error: "Missing user IDs" }, { status: 400 });
 
@@ -38,7 +64,6 @@ export async function GET(req) {
                                  .orderBy("timestamp", "desc")
                                  .limit(limit);
 
-        // If a cursor is provided, fetch messages older than the cursor
         if (cursor) {
             messagesQuery = messagesQuery.startAfter(new Date(cursor));
         }
@@ -51,7 +76,6 @@ export async function GET(req) {
             return { id: doc.id, ...data, timestamp };
         });
 
-        // Return messages in ascending order for the client
         return NextResponse.json({ messages: messages.reverse() });
     } catch (err) {
         if (err.message.includes('NOT_FOUND')) {

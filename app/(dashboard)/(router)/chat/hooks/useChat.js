@@ -1,9 +1,8 @@
-// app/(dashboard)/(router)/chat/hooks/useChat.js
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAbly } from 'ably/react';
+import { getAuth } from "firebase/auth";
 
-// The hook is defined with "export const" to make it a named export.
 export const useChat = (myChatId, selectedUser) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -67,11 +66,20 @@ export const useChat = (myChatId, selectedUser) => {
   const sendMessage = async () => {
     if (!input.trim() || !myChatId || !selectedUser) return;
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+        console.error("User not authenticated to send message");
+        return;
+    }
+    const token = await user.getIdToken();
+
     const chatId = [myChatId, selectedUser.chatId].sort().join('_');
     const timestamp = new Date().toISOString();
     
+    // **THE FIX IS HERE**: Ensure the senderId is always the logged-in user's ID
     const messageData = { 
-      senderId: myChatId, 
+      senderId: myChatId, // Use myChatId to guarantee it matches the authenticated user
       message: input.trim(),
       timestamp: timestamp 
     };
@@ -98,7 +106,10 @@ export const useChat = (myChatId, selectedUser) => {
 
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ ...messageData, receiverId: selectedUser.chatId }),
       });
 
