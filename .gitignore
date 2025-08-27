@@ -39,3 +39,4 @@ coverage
 .DS_Store
 
 fix-key.js
+serviceAccountKey.json
