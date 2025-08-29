@@ -2,7 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../../../_utils/FirebaseAuthContext";
-import Link from "next/link"; // Import the Link component
+import Link from "next/link";
+import { FiVideo, FiUsers, FiLink, FiCopy, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 // --- Start of New Code ---
 // The NavLocation component for breadcrumb navigation
@@ -125,86 +127,133 @@ export default function MeetingPage() {
   };
 
 
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(meetingUrl);
+    toast.success('Link copied to clipboard');
+  };
+
   if (loading || !user) {
     return <div className="text-center mt-16 animate-pulse">Loading...</div>;
   }
 
   return (
-    // Added a main container and the NavLocation component
-    <div className="p-5 px-8 md:px-8">
-      <NavLocation />
-      <div className="max-w-lg mx-auto mt-8 bg-white rounded-xl shadow-lg p-8 flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">Start a Video Meeting</h1>
-        <p className="text-gray-600 mb-6 text-center">Create a new meeting or join an existing one using a link or code.</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header & Breadcrumb */}
+      <div className="max-w-6xl mx-auto mb-8">
+        <br/>
+        
+        {/* <NavLocation /> */}
+        <h1 className="text-3xl font-bold text-gray-900">Video Meetings</h1>
+        <p className="text-gray-600 mt-2">Create or join secure video meetings</p>
+      </div>
 
-        {/* --- Create Meeting Section --- */}
-        <form className="w-full flex flex-col gap-4" onSubmit={handleCreate}>
-          <input
-            className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
-            placeholder="Enter your name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white rounded-lg py-2 font-semibold hover:bg-blue-700 transition shadow-md hover:shadow-lg"
-          >
-            Create New Meeting
-          </button>
-        </form>
-
-        {/* --- Display Generated Meeting Link --- */}
-        {meetingUrl && (
-          <div className="mt-6 w-full bg-blue-50 p-4 rounded-lg">
-            <div className="mb-2 text-sm font-semibold text-gray-700">Share this link to invite others:</div>
-            <input
-              className="border rounded-lg px-3 py-2 w-full text-sm bg-white"
-              value={meetingUrl}
-              readOnly
-              onFocus={e => e.target.select()}
-            />
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8">
+        {/* Create Meeting Section */}
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <FiVideo className="text-blue-600 w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Create Meeting</h2>
+              <p className="text-sm text-gray-500">Start a new video conference</p>
+            </div>
           </div>
-        )}
 
-        <div className="w-full my-6 border-t"></div>
-
-        {/* --- Join Meeting Section --- */}
-        <div className="w-full">
-          <button
-            className="w-full text-blue-600 font-semibold text-center mb-4"
-            onClick={() => setShowJoinSection(v => !v)}
-          >
-            {showJoinSection ? "▼ Hide Join Section" : "▶ Join a Meeting"}
-          </button>
-          {showJoinSection && (
-            <form className="flex flex-col gap-3" onSubmit={handleDirectJoin}>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
               <input
-                className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                placeholder="Paste meeting link or enter room code"
-                value={joinMeetingUrl}
-                onChange={e => setJoinMeetingUrl(e.target.value)}
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your name"
                 required
               />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <FiVideo />
+              Create New Meeting
+            </button>
+          </form>
+
+          {meetingUrl && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-700">Share meeting link</span>
+                <button
+                  onClick={copyLinkToClipboard}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <FiCopy className="w-5 h-5" />
+                </button>
+              </div>
               <input
-                className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-                placeholder="Your Name"
-                value={joinName}
-                onChange={e => setJoinName(e.target.value)}
-                required
+                type="text"
+                readOnly
+                value={meetingUrl}
+                className="w-full bg-white px-3 py-2 rounded border border-blue-200 text-sm"
+                onClick={e => e.target.select()}
               />
-              <button
-                type="submit"
-                className="bg-green-600 text-white rounded-lg py-2 font-semibold hover:bg-green-700 transition shadow-md hover:shadow-lg"
-              >
-                Join Meeting
-              </button>
-            </form>
+            </div>
           )}
         </div>
-         <div className="mt-8 text-xs text-gray-500 text-center">
-          Powered by Cloud Sharing
+
+        {/* Join Meeting Section */}
+        <div className="bg-white rounded-2xl shadow-sm p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <FiUsers className="text-green-600 w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Join Meeting</h2>
+              <p className="text-sm text-gray-500">Enter a code or link</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleDirectJoin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Code or Link</label>
+              <input
+                type="text"
+                value={joinMeetingUrl}
+                onChange={e => setJoinMeetingUrl(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Enter meeting code or paste link"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+              <input
+                type="text"
+                value={joinName}
+                onChange={e => setJoinName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <FiUsers />
+              Join Meeting
+            </button>
+          </form>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="max-w-6xl mx-auto mt-8 text-center">
+        <p className="text-sm text-gray-500">
+          Secure, encrypted video meetings powered by Cloud Sharing
+        </p>
       </div>
     </div>
   );

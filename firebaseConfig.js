@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDocs, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, deleteObject } from "firebase/storage";
 import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -74,20 +74,26 @@ export const fileEvents = new FileEventEmitter();
  * @param {string} fileId
  * @returns {Promise<boolean>}
  */
-export const moveToRecycleBin = async (fileData, fileId) => {
-    try {
-        await setDoc(doc(db, 'recycleBin', fileId), {
-            ...fileData,
-            originalLocation: 'uploadedFile',
-            deletedAt: new Date().toISOString()
-        });
-        await deleteDoc(doc(db, 'uploadedFile', fileId));
-        console.log('File moved to recycle bin:', fileId);
-        return true;
-    } catch (error) {
-        console.error('Error moving file to recycle bin:', error);
-        return false;
-    }
+export const moveToRecycleBin = async (file, fileId) => {
+  try {
+    const recycleBinRef = doc(db, "recycleBin", fileId);
+    const sourceCollectionName = file.type === "folder" ? "uploadedFolders" : "uploadedFiles";
+    const sourceRef = doc(db, sourceCollectionName, fileId);
+
+    // Add to recycle bin
+    await setDoc(recycleBinRef, {
+      ...file,
+      deletedAt: serverTimestamp()
+    });
+
+    // Delete from source collection
+    await deleteDoc(sourceRef);
+
+    return true;
+  } catch (error) {
+    console.error("Error moving to recycle bin:", error);
+    return false;
+  }
 };
 
 /**

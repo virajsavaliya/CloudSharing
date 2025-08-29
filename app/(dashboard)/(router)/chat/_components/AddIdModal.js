@@ -1,6 +1,6 @@
 // app/(dashboard)/(router)/chat/_components/AddIdModal.js
 import React, { useState } from 'react';
-import { MessageSquarePlus, X } from 'lucide-react';
+import { MessageSquarePlus, X, Loader2 } from 'lucide-react';
 
 const AddIdModal = ({ show, onClose, myChatId, onConnectAndSend }) => {
   const [otherId, setOtherId] = useState("");
@@ -16,24 +16,23 @@ const AddIdModal = ({ show, onClose, myChatId, onConnectAndSend }) => {
         setIdError(otherId === myChatId ? "You can't chat with yourself." : "Please enter a valid Chat ID.");
         return;
     }
-     if (!message.trim()) {
+    if (!message.trim()) {
         setIdError("Please enter a message to start the conversation.");
         return;
     }
 
     setIsLoading(true);
     try {
-        // 1. Find the user
-        const response = await fetch(`/api/find-user?chatId=${otherId.trim()}`);
+        const trimmedId = otherId.trim();
+        const response = await fetch(`/api/find-user?chatId=${trimmedId}`);
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "User not found");
+            throw new Error(data.error || "User not found. Please check the Chat ID.");
         }
         const foundUser = data.user;
 
-        // 2. Send the message via API
-        await fetch('/api/chat', {
+        const chatResponse = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -43,10 +42,11 @@ const AddIdModal = ({ show, onClose, myChatId, onConnectAndSend }) => {
             }),
         });
 
-        // 3. Notify the parent component to update UI
+        if (!chatResponse.ok) {
+            throw new Error("Failed to send message. Please try again.");
+        }
+
         onConnectAndSend(foundUser);
-        
-        // 4. Clear state and close
         setOtherId("");
         setMessage("");
         onClose();
@@ -58,7 +58,7 @@ const AddIdModal = ({ show, onClose, myChatId, onConnectAndSend }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-bold text-xl text-gray-800 flex items-center gap-3">
@@ -71,35 +71,50 @@ const AddIdModal = ({ show, onClose, myChatId, onConnectAndSend }) => {
         
         <label className="text-sm font-medium text-gray-700">Recipient's Chat ID</label>
         <input
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 mt-1 mb-4 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+          className={`w-full border ${idError ? 'border-red-300' : 'border-gray-300'} rounded-lg px-4 py-3 mt-1 mb-4 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
           placeholder="Enter Chat ID"
           value={otherId}
           onChange={(e) => { setOtherId(e.target.value); setIdError(""); }}
+          disabled={isLoading}
           autoFocus
         />
         
         <label className="text-sm font-medium text-gray-700">Your first message</label>
         <textarea
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 mt-1 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-          placeholder="Say hello!"
+          className={`w-full border ${idError ? 'border-red-300' : 'border-gray-300'} rounded-lg px-4 py-3 mt-1 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition resize-none`}
+          placeholder="Type your message here..."
           rows={3}
           value={message}
           onChange={(e) => { setMessage(e.target.value); setIdError(""); }}
+          disabled={isLoading}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
               e.preventDefault();
               handleSend();
             }
           }}
         />
 
-        {idError && <div className="text-sm text-red-500 mb-4">{idError}</div>}
+        {idError && (
+          <div className="text-sm text-red-500 mb-4 flex items-center gap-2">
+            <span className="inline-block w-4 h-4">⚠️</span>
+            {idError}
+          </div>
+        )}
+        
         <button
-          className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50"
+          className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           onClick={handleSend}
           disabled={isLoading}
         >
-          {isLoading ? "Sending..." : "Send Message"}
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            "Send Message"
+          )}
         </button>
       </div>
     </div>

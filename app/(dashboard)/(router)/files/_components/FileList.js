@@ -42,7 +42,7 @@ function FileList({ files = [], setFiles, onDelete, onDownload }) {
                      className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
                     <div className="flex items-center justify-between mb-4">
                         <Image
-                            src={getFileIcon(file.fileName || file.fileType)}
+                            src={getFileIcon(file)}  // Pass the whole file object
                             width={40}
                             height={40}
                             alt="File icon"

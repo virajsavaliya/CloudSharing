@@ -74,7 +74,7 @@ export default function PaymentModal({
       const checkoutOptions = {
         paymentSessionId: sessionId,
         returnUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade?order_id={order_id}`,
-        };
+      };
       cashfree.checkout(checkoutOptions).then((result) => {
         if (result.error) {
           setError(result.error.message);
