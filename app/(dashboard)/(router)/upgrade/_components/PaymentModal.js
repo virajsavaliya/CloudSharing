@@ -19,7 +19,7 @@ export default function PaymentModal({
     const initializeCashfree = async () => {
       try {
         const cf = await load({
-          mode: "sandbox", 
+          mode: "sandbox",
         });
         setCashfree(cf);
       } catch (e) {
@@ -43,7 +43,7 @@ export default function PaymentModal({
           user,
           planName,
           duration,
-          basePrice, 
+          basePrice,
         }),
       });
 
@@ -73,8 +73,8 @@ export default function PaymentModal({
     if (sessionId) {
       const checkoutOptions = {
         paymentSessionId: sessionId,
-        returnUrl: `http://localhost:3000/upgrade?order_id={order_id}`,
-      };
+        returnUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade?order_id={order_id}`,
+        };
       cashfree.checkout(checkoutOptions).then((result) => {
         if (result.error) {
           setError(result.error.message);

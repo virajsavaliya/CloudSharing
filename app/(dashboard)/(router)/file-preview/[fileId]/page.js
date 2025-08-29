@@ -1,21 +1,17 @@
-// page.js (Cleaned Up)
 "use client";
-import React, { useEffect, useState, useCallback } from 'react';
-import FileInfo from './_components/FileInfo';
-import FileShareForm from './_components/FileShareForm';
-// import LocalShare from './_components/LocalShare'; // <-- REMOVED
-import { getAuth } from 'firebase/auth';
-import { app } from '../../../../../firebaseConfig';
-import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
-import Image from 'next/image'
-import OnlineUserList from '../../../../_components/OnlineUserList'
+import React, { useEffect, useState, useCallback } from "react";
+import FileInfo from "./_components/FileInfo";
+import FileShareForm from "./_components/FileShareForm";
+import { getAuth } from "firebase/auth";
+import { app } from "../../../../../firebaseConfig";
+import { doc, getDoc, getFirestore, updateDoc } from "firebase/firestore";
+import Image from "next/image";
+import OnlineUserList from "../../../../_components/OnlineUserList";
+import { motion } from "framer-motion";
 
 function FilePreview({ params }) {
   const db = getFirestore(app);
   const [file, setFile] = useState(null);
-  const [windowWidth, setWindowWidth] = useState(null);
-  const auth = getAuth(app); 
-  const user = auth.currentUser; 
 
   const getFileInfo = useCallback(async () => {
     try {
@@ -28,10 +24,8 @@ function FilePreview({ params }) {
       }
 
       if (docSnap.exists()) {
-        const fileData = { ...docSnap.data(), id: docSnap.id };
-        setFile(fileData);
+        setFile({ ...docSnap.data(), id: docSnap.id });
       } else {
-        console.log("No such document found!");
         setFile(null);
       }
     } catch (error) {
@@ -40,68 +34,71 @@ function FilePreview({ params }) {
     }
   }, [db, params.fileId]);
 
-
-
   useEffect(() => {
-    if (params?.fileId) {
-      getFileInfo();
-    }
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (params?.fileId) getFileInfo();
   }, [params?.fileId, getFileInfo]);
 
   const onPasswordSave = async (password) => {
     const docRef = doc(db, file?.files ? "uploadedFolders" : "uploadedFile", params?.fileId);
-    await updateDoc(docRef, {
-      password: password
-    });
-    console.log('Password saved:', password);
+    await updateDoc(docRef, { password });
   };
 
   const onReceiversAdd = async (emails) => {
-    if (!emails || emails.length === 0) return;
+    if (!emails?.length) return;
     const docRef = doc(db, file?.files ? "uploadedFolders" : "uploadedFile", params?.fileId);
     const currentReceivers = Array.isArray(file?.receivers) ? file.receivers : [];
     const newReceivers = Array.from(new Set([...currentReceivers, ...emails]));
     await updateDoc(docRef, { receivers: newReceivers });
-    setFile(prev => ({ ...prev, receivers: newReceivers }));
+    setFile((prev) => ({ ...prev, receivers: newReceivers }));
   };
 
   if (!file) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Image
-          src="/loader.gif"
-          alt="Loading..."
-          width={350}
-          height={350}
-          className="w-100 h-100"
-        />
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
+        <Image src="/loader.gif" alt="Loading..." width={200} height={200} />
       </div>
     );
   }
 
   return (
-    <div className={`px-5 ${windowWidth <= 768 ? 'py-5' : 'py-10'}`}>
-      <div className="md:block">
-        <nav aria-label="Breadcrumb">{/*... breadcrumb code ...*/}</nav>
-      </div>
+    <div className="min-h-screen px-6 py-10 bg-gradient-to-br from-gray-50 via-white to-gray-200">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="text-center mb-10"
+      >
+        <h1 className="text-4xl font-extrabold text-gray-800">File Preview & Share</h1>
 
-      <div className="text-center mb-8 mt-10">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">File Preview & Share</h1>
-        <hr className="border-b-2 border-gray-300 w-16 mx-auto" />
-      </div>
+        <hr className="border-b-2 border-gray-300 w-40 mx-auto mt-2" />
+      </motion.div>
 
-      {/* File & Share Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 mt-5 gap-8">
-        <FileInfo file={file} />
-        <div className="flex flex-col gap-5">
+      {/* Glassy Card Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* File Info */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6 }}
+          className="col-span-1"
+        >
+          <FileInfo file={file} />
+        </motion.div>
+
+        {/* Share + Users */}
+        <div className="col-span-2 flex flex-col gap-6">
           <FileShareForm file={file} onPasswordSave={onPasswordSave} onReceiversAdd={onReceiversAdd} />
-          <OnlineUserList file={file} />
-          {/* The old LocalShare component has been removed */}
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="rounded-2xl bg-white/40 backdrop-blur-xl p-6 shadow-lg border border-white/20"
+          >
+            <h2 className="text-lg font-semibold text-gray-700 mb-3">Active Users</h2>
+            <OnlineUserList file={file} />
+          </motion.div>
         </div>
       </div>
     </div>

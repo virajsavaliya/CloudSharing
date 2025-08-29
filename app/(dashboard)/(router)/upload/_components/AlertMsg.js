@@ -1,13 +1,11 @@
-
 import { AlertCircle } from 'lucide-react';
 import React from 'react';
 
 function AlertMsg({ msg }) {
   return (
-    <div className='p-4 bg-red-500
-    mt-5 text-white rounded-md flex gap-5 item-center'>
-      <AlertCircle/>
-      {msg}
+    <div className="flex items-center gap-3 rounded-lg p-3 bg-red-100 border border-red-200 text-red-600">
+      <AlertCircle />
+      <span className="text-sm">{msg}</span>
     </div>
   );
 }

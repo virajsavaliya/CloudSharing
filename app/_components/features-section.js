@@ -1,134 +1,114 @@
-'use client';
+// File: app/_components/features-section.js
 
-import React, { useState, useEffect, useRef } from "react";
-import { UploadCloud, Shield, Link as Clock, Download, ChevronLeft, ChevronRight, MessageSquare, Video } from "lucide-react";
-import { motion, useMotionValue, useAnimation } from "framer-motion";
+import React from "react";
+import { UploadCloud, Shield, Lock, Users, Link as LinkIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 const features = [
-  { icon: <UploadCloud className="w-10 h-10 text-primary" />, title: "Easy Uploads", description: "Drag and drop files to instantly create a shareable link." },
-  { icon: <Shield className="w-10 h-10 text-primary" />, title: "Secure & Private", description: "Your files are encrypted and only accessible via a unique, secure link." },
-  { icon: <MessageSquare className="w-10 h-10 text-primary" />, title: "Chat", description: "Connect instantly with users through real-time messaging." },
-  { icon: <Clock className="w-10 h-10 text-primary" />, title: "Link Expiration", description: "For your security, all links automatically expire after 24 hours." },
-  { icon: <Download className="w-10 h-10 text-primary" />, title: "Fast Downloads", description: "Recipients can download your files instantly with no sign-up required." },
-  { icon: <Video className="w-10 h-10 text-primary" />, title: "Meeting", description: "Host or join high-quality video meetings with ease." },
+  {
+    icon: <UploadCloud className="w-16 h-16 text-primary/80" />,
+    title: "Instant Drag & Drop",
+    description: "Effortlessly upload and share files with a simple drag-and-drop interface."
+  },
+  {
+    icon: <Lock className="w-16 h-16 text-primary/80" />,
+    title: "Password Protection",
+    description: "Add an extra layer of security with password-protected shareable links."
+  },
+  {
+    icon: <Users className="w-16 h-16 text-primary/80" />,
+    title: "Real-time Collaboration",
+    description: "Work together on shared documents in real-time without leaving the app."
+  },
+  {
+    icon: <LinkIcon className="w-16 h-16 text-primary/80" />,
+    title: "Customizable Links",
+    description: "Create branded and custom shareable links for a professional touch."
+  },
+  {
+    icon: <Shield className="w-16 h-16 text-primary/80" />,
+    title: "Secure & Encrypted",
+    description: "Your data is protected with end-to-end encryption and robust security measures."
+  },
 ];
 
 const FeatureCard = ({ icon, title, description }) => (
-  <div className="flex flex-col items-center justify-center w-[300px] h-[300px] bg-white rounded-2xl p-6 shadow-lg text-center mx-4">
-    <div className="bg-primary/10 p-4 rounded-xl mb-4">{icon}</div>
-    <h3 className="text-xl font-bold mb-2">{title}</h3>
-    <p className="text-gray-600">{description}</p>
-  </div>
+  <motion.div
+    className="relative group p-8 bg-white backdrop-blur-md rounded-3xl shadow-lg border border-gray-200 overflow-hidden"
+    whileHover={{ scale: 1.03 }}
+    transition={{ duration: 0.3 }}
+  >
+    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
+    <div className="relative z-10 flex flex-col items-start text-left">
+      <div className="p-4 bg-primary/10 rounded-2xl mb-6">
+        {React.cloneElement(icon, { className: "w-8 h-8 text-primary" })}
+      </div>
+      <h3 className="text-xl md:text-2xl font-bold mb-2 text-gray-900">{title}</h3>
+      <p className="text-gray-600">{description}</p>
+    </div>
+  </motion.div>
 );
 
 export function FeaturesSection() {
-  const [width, setWidth] = useState(0);
-  const carouselRef = useRef(null);
-  const x = useMotionValue(0);
-  const controls = useAnimation();
-
-  // Prepare duplicated slides for infinite loop
-  const slides = [features[features.length - 1], ...features, features[0]];
-
-  useEffect(() => {
-    const updateWidth = () => {
-      if (carouselRef.current) {
-        setWidth(carouselRef.current.offsetWidth);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.3
       }
-    };
-
-    updateWidth();
-    window.addEventListener("resize", updateWidth);
-    return () => window.removeEventListener("resize", updateWidth);
-  }, []);
-
-  const handleDragEnd = (_, info) => {
-    const distance = info.offset.x;
-
-    if (distance < -50) {
-      nextSlide();
-    } else if (distance > 50) {
-      prevSlide();
-    } else {
-      controls.start({ x: -width }); // Snap back if not enough swipe
     }
   };
 
-  const nextSlide = () => {
-    controls.start({
-      x: -width * 2,
-      transition: { duration: 0.4 },
-    }).then(() => {
-      controls.set({ x: -width });
-    });
-  };
-
-  const prevSlide = () => {
-    controls.start({
-      x: 0,
-      transition: { duration: 0.4 },
-    }).then(() => {
-      controls.set({ x: -width });
-    });
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.8 } }
   };
 
   return (
-    <section id="features" className="w-full py-16 md:py-24 bg-secondary/50">
+    <section id="features" className="w-full py-16 md:py-24 bg-gray-50 transition-colors">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <motion.h2
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-3xl md:text-4xl font-extrabold tracking-tighter text-gray-900"
+        <div className="text-center mb-16 max-w-2xl mx-auto">
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            className="text-primary text-sm font-semibold tracking-wider uppercase mb-2"
           >
-            Why You'll Love CloudSharing
+            Explore Features
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-4xl md:text-5xl font-extrabold tracking-tighter text-gray-900"
+          >
+            Why You'll Love CloudSharing <br />
+            <span className="text-primary">explore all-in-one platform.</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            viewport={{ once: true }}
-            className="mt-4 text-lg text-gray-600 max-w-xl mx-auto"
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mt-4 text-lg text-gray-600"
           >
             Everything you need for simple, fast, and secure file sharing.
           </motion.p>
         </div>
 
-        <div
-          ref={carouselRef}
-          className="relative flex items-center justify-center overflow-hidden group"
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.5 }}
         >
-          {/* Arrows */}
-          <button
-            onClick={prevSlide}
-            className="absolute left-4 md:left-2 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100 flex"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-
-          <motion.div
-            drag="x"
-            dragConstraints={{ left: -width * 2, right: 0 }}
-            onDragEnd={handleDragEnd}
-            animate={controls}
-            initial={{ x: -width }}
-            className="flex cursor-grab"
-            style={{ x }}
-          >
-            {slides.map((feature, index) => (
-              <FeatureCard key={index} {...feature} />
-            ))}
-          </motion.div>
-
-          <button
-            onClick={nextSlide}
-            className="absolute right-4 md:right-2 z-10 bg-white p-2 rounded-full shadow hover:bg-gray-100 flex"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
-        </div>
+          {features.map((feature, index) => (
+            <motion.div key={index} variants={itemVariants}>
+              <FeatureCard {...feature} />
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );

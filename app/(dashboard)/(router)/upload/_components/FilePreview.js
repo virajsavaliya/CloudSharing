@@ -1,42 +1,93 @@
-import { X, CheckCircle } from "lucide-react";
+// FilePreview.js
+import { X } from "lucide-react";
 import React from "react";
-import { getFileIcon } from "../../../../_utils/fileIcons";
+import { motion } from "framer-motion";
 import Image from "next/image";
 
-function FilePreview({ file, removeFile, uploaded }) {
-  // Get icon based on file extension/type
-  const iconSrc = getFileIcon(file.name || file.type);
+// Map extensions → svg filenames
+const extToIcon = {
+  // docs
+  doc: "word.svg",
+  docx: "word.svg",
+  xls: "excel.svg",
+  xlsx: "excel.svg",
+  ppt: "powerpoint.svg",
+  pptx: "powerpoint.svg",
+
+  // pdf
+  pdf: "pdf.svg",
+
+  // archives
+  zip: "zip.svg",
+  rar: "zip.svg",
+  "7z": "zip.svg",
+
+  // images
+  png: "image.svg",
+  jpg: "image.svg",
+  jpeg: "image.svg",
+  gif: "image.svg",
+  svg: "image.svg",
+  heic: "image.svg",
+  heif: "image.svg",
+
+  // video
+  mp4: "video.svg",
+  mov: "video.svg",
+  webm: "video.svg",
+  avi: "video.svg",
+  mkv: "video.svg",
+
+  // audio
+  mp3: "audio.svg",
+  wav: "audio.svg",
+  ogg: "audio.svg",
+  flac: "audio.svg",
+  aac: "audio.svg",
+  amr: "audio.svg",
+  wma: "audio.svg",
+};
+
+function FilePreview({ file, remove }) {
+  const filename = file.name || "unknown";
+  const sizeMb = (file.size / 1024 / 1024).toFixed(2);
+
+  const ext = filename.split(".").pop()?.toLowerCase();
+  const iconFile = extToIcon[ext] || "file.svg";
+  const iconPath = `/icons/${iconFile}`;
 
   return (
-    <div className="flex items-center gap-2 justify-between mt-5 w-full border rounded-md p-2 border-blue-200">
-      <div className="flex items-center p-2 gap-2">
-        <Image
-          src={getFileIcon(file.name || file.type)}
-          alt="file icon"
-          width={40}
-          height={40}
-          className="object-contain"
-        />
-        <div className="text-left overflow-hidden">
-          <h2 className="overflow-hidden text-ellipsis whitespace-nowrap w-32 md:w-48">
-            {file.name}
-          </h2>
-          <h2 className="text-[12px] text-gray-400">
-            {file?.type} / {(file.size / 1024 / 1024).toFixed(2)}MB
-          </h2>
+    <motion.div
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -6 }}
+      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50 transition"
+    >
+      {/* Icon + File info */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="w-8 h-8 flex-shrink-0">
+          <Image
+            src={iconPath}
+            alt={ext || "file"}
+            width={32}
+            height={32}
+            className="object-contain"
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm text-gray-800 truncate">{filename}</div>
+          <div className="text-xs text-gray-500">{sizeMb} MB</div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {/* Green Tick for uploaded files */}
-        {uploaded && <CheckCircle className="text-green-500" size={22} />}
-        <X
-          className="text-red-500 cursor-pointer"
-          onClick={() => {
-            removeFile(file);
-          }}
-        />
-      </div>
-    </div>
+
+      {/* Remove button */}
+      <button
+        onClick={remove}
+        className="p-1 rounded-full hover:bg-gray-200 transition flex-shrink-0"
+      >
+        <X className="text-gray-500 w-4 h-4" />
+      </button>
+    </motion.div>
   );
 }
 

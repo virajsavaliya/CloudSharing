@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import UploadForm from "./_components/UploadForm";
-import { useAuth } from "../../../_utils/FirebaseAuthContext"; // <-- new context
+import GlassUploadPage from "./_components/UploadForm";
+import { useAuth } from "../../../_utils/FirebaseAuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import {
   getStorage,
@@ -14,17 +14,14 @@ import { generateRandomString } from "../../../_utils/GenerateRandomString";
 import { app } from "../../../../firebaseConfig";
 import Image from 'next/image'
 
-
 function Upload() {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const router = useRouter();
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [showPopup, setShowPopup] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("Free");
 
-  // Initialize Firebase instances
   const storage = getStorage(app);
   const db = getFirestore(app);
 
@@ -34,7 +31,6 @@ function Upload() {
     }
   }, [loading, user, router, pathname]);
 
-  // Fetch user's plan
   useEffect(() => {
     const fetchUserPlan = async () => {
       if (!user || !user.uid) return;
@@ -61,24 +57,21 @@ function Upload() {
     }
   };
 
-  const uploadFiles = async (files, receivers = []) => {
-    // Check file size limits
+  const uploadFiles = async (files, title, notes, receivers = []) => { // Update function signature
     const sizeLimit = getFileSizeLimit();
     const oversizedFiles = files.filter((file) => file.size > sizeLimit);
 
     if (oversizedFiles.length > 0) {
       alert(
-        `Your ${currentPlan} plan allows maximum file size of ${sizeLimit / (1024 * 1024)}MB per file. Please upgrade your plan for larger files.`
+        `Your ${currentPlan} plan allows a maximum file size of ${sizeLimit / (1024 * 1024)}MB per file. Please upgrade your plan for larger files.`
       );
       return;
     }
 
     setIsUploading(true);
     setProgress(0);
-    setShowPopup(false);
 
     if (files.length === 1) {
-      // ✅ Single File Upload (Stored in 'uploadedFile')
       const file = files[0];
       const docId = generateRandomString();
       const storageRef = ref(storage, `file-upload/${file.name}`);
@@ -87,7 +80,8 @@ function Upload() {
       uploadTask.on(
         "state_changed",
         (snapshot) => {
-          setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          const newProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setProgress(Math.round(newProgress));
         },
         (error) => {
           console.error("Upload failed:", error);
@@ -96,7 +90,9 @@ function Upload() {
         async () => {
           const fileUrl = await getDownloadURL(uploadTask.snapshot.ref);
           await setDoc(doc(db, "uploadedFile", docId), {
-            fileName: file.name,
+            fileName: title || file.name, // Use title or original filename
+            title, // Store the title
+            notes, // Store the notes
             fileSize: file.size,
             fileType: file.type,
             fileUrl: fileUrl,
@@ -104,7 +100,7 @@ function Upload() {
             userName: user?.displayName,
             shortUrl: process.env.NEXT_PUBLIC_BASE_URL + docId,
             createdAt: new Date(),
-            receivers, // <-- store receivers array
+            receivers,
           });
 
           setIsUploading(false);
@@ -112,23 +108,28 @@ function Upload() {
         }
       );
     } else {
-      // ✅ Multi-File Upload (Stored in 'uploadedFolders')
       const folderId = generateRandomString();
       const folderRef = `file-upload/${folderId}/`;
       let uploadedFiles = [];
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      let totalBytesTransferred = 0;
 
       for (const file of files) {
         const storageRef = ref(storage, folderRef + file.name);
         const uploadTask = uploadBytesResumable(storageRef, file);
 
         await new Promise((resolve, reject) => {
-          uploadTask.on(
+          const unsubscribe = uploadTask.on(
             "state_changed",
             (snapshot) => {
-              setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              const fileBytesTransferred = snapshot.bytesTransferred;
+              
+              const totalProgress = ((totalBytesTransferred + fileBytesTransferred) / totalSize) * 100;
+              setProgress(Math.round(totalProgress));
             },
             (error) => {
               console.error("Upload failed:", error);
+              unsubscribe();
               reject(error);
             },
             async () => {
@@ -139,6 +140,8 @@ function Upload() {
                 fileType: file.type,
                 fileUrl: fileUrl,
               });
+              totalBytesTransferred += file.size;
+              unsubscribe();
               resolve();
             }
           );
@@ -147,12 +150,14 @@ function Upload() {
 
       await setDoc(doc(db, "uploadedFolders", folderId), {
         folderId,
+        title, // Store the title
+        notes, // Store the notes
         files: uploadedFiles,
         userEmail: user?.email,
         userName: user?.displayName,
         shortUrl: process.env.NEXT_PUBLIC_BASE_URL + folderId,
         createdAt: new Date(),
-        receivers, // <-- store receivers array
+        receivers,
       });
 
       setIsUploading(false);
@@ -171,12 +176,11 @@ function Upload() {
             <strong className="text-primary">Uploading</strong> Files and{" "}
             <strong className="text-primary">Share</strong> Them
           </h2>
-          <UploadForm
-            uploadBtnClick={(files) => uploadFiles(files)}
+          <GlassUploadPage
+            uploadBtnClick={(files, title, notes) => uploadFiles(files, title, notes)} // Update function call
             isUploading={isUploading}
             progress={progress}
           />
-          {showPopup && <Popup />}
         </>
       ) : (
         <button
@@ -189,7 +193,6 @@ function Upload() {
     </div>
   );
 }
-
 // ✅ Navigation Breadcrumb
 const NavLocation = () => {
   return (
@@ -245,19 +248,7 @@ const UploadTitle = () => {
   return (
     <div className="text-center mb-8 mt-10">
       <h1 className="text-3xl font-bold text-gray-800 mb-2">File Upload</h1>
-      <hr className="border-b-2 border-gray-300 w-16 mx-auto" />
-    </div>
-  );
-};
-
-// ✅ Popup on Upload Completion
-const Popup = () => {
-  return (
-    <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center z-50">
-      <div className="fixed inset-0 bg-black opacity-50"></div>
-      <div className="bg-white p-8 rounded-lg shadow-lg relative z-10">
-        <p className="text-lg font-semibold">Files uploaded successfully!</p>
-      </div>
+      <hr className="border-b-2 border-gray-300 w-16 mx-auto mt-2" />
     </div>
   );
 };

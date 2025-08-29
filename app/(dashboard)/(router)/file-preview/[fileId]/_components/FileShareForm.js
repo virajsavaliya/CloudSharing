@@ -4,6 +4,7 @@ import GlobalApi from '../../../../../_utils/GlobalApi';
 import { getAuth } from "firebase/auth";
 import ClipLoader from 'react-spinners/ClipLoader';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 
 function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
   const [isPasswordEnable, setIsEnablePassword] = useState(false);
@@ -36,8 +37,6 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
     setEmails(emails.filter(email => email !== emailToRemove));
   };
 
-  // ✅ 1. UPDATE THE SendEmail FUNCTION
-  // This now checks for a valid email in the input box before sending.
   const SendEmail = () => {
     const emailsToSend = [...emails];
     if (isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
@@ -45,7 +44,7 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
     }
 
     if (emailsToSend.length === 0) return;
-    
+
     setLoading(true);
     const promises = emailsToSend.map(emailAddress => {
       const data = {
@@ -87,22 +86,30 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
   };
 
   return (
-    <div className="flex flex-col gap-4 border p-5 rounded-md">
-      
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8 }}
+      className="flex flex-col gap-6 p-6 md:p-8 rounded-2xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-xl"
+    >
+
+
       {/* Short URL Section */}
-      <div>
-        <label className="text-[14px] text-gray-500">Short URL</label>
-        <div className="relative flex items-center p-2 border rounded-md">
+      <div className="relative">
+        <label className="text-sm font-medium text-gray-700">Short URL</label>
+        <div className="relative flex items-center mt-1 p-2 border rounded-md bg-gray-50/50">
           <input
             type="text"
             value={file.shortUrl || ''}
             disabled
-            className="flex-grow disabled:text-gray-500 bg-transparent outline-none mr-2"
+            className="flex-grow disabled:text-gray-500 bg-transparent outline-none mr-2 text-sm"
           />
           {copied ? (
             <CheckCircle size={24} className="text-green-500" />
           ) : (
-            <Copy className="text-gray-400 cursor-pointer hover:text-gray-600" onClick={handleCopy} />
+            <motion.div whileTap={{ scale: 0.9 }}>
+              <Copy className="text-gray-400 cursor-pointer hover:text-gray-600 transition" onClick={handleCopy} />
+            </motion.div>
           )}
         </div>
       </div>
@@ -111,77 +118,90 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
       <div className="flex items-center gap-3">
         <input
           type="checkbox"
+          id="passwordToggle"
+          className="form-checkbox h-5 w-5 text-primary rounded"
           onChange={(e) => setIsEnablePassword(e.target.checked)}
         />
-        <label>Enable Password</label>
+        <label htmlFor="passwordToggle" className="text-sm font-medium text-gray-700">Enable Password</label>
       </div>
 
       {isPasswordEnable && (
-        <div className="flex flex-col md:flex-row gap-3 items-center">
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col md:flex-row gap-3 items-center">
           <input
             type="password"
             value={password}
-            className={`border rounded-md p-2 w-full bg-transparent outline-none ${isTyping ? 'animate-typing' : ''}`}
+            placeholder="Enter password"
+            className={`border rounded-md p-2 w-full bg-white outline-none transition focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isTyping ? 'animate-typing' : ''}`}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={() => setIsTyping(true)}
             onKeyUp={() => setTimeout(() => setIsTyping(false), 1000)}
           />
           {!passwordSaved ? (
-            <button
-              className="p-2 bg-primary text-white rounded-md disabled:bg-gray-300 hover:bg-blue-500"
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              className="p-2 bg-primary text-white rounded-md disabled:bg-gray-300 hover:bg-blue-500 transition w-full md:w-auto flex-shrink-0"
               disabled={password.length < 3}
               onClick={handlePasswordSave}
             >
               Save
-            </button>
+            </motion.button>
           ) : (
             <CheckCircle size={25} className="text-blue-500 animate-bounce" />
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Send File via Email */}
-      <div className="border rounded-md p-4">
-        <label className="text-[14px] text-gray-500">Send File to Email</label>
+      <div className="p-4 rounded-md bg-white/70 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700">Send File to Email</label>
         <div className="flex flex-wrap gap-2 my-2">
           {emails.map((email, index) => (
-            <div key={index} className="flex items-center bg-blue-100 px-2 py-1 rounded">
-              <span className="text-sm text-blue-700">{email}</span>
+            <motion.div
+              key={index}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="flex items-center bg-blue-100 px-2 py-1 rounded-full text-blue-700 text-sm">
+              <span>{email}</span>
               <X size={14} className="ml-1 cursor-pointer hover:text-blue-900" onClick={() => removeEmail(email)} />
-            </div>
+            </motion.div>
           ))}
         </div>
-        
-        <div className="flex gap-2">
+
+        <div className="flex flex-col md:flex-row gap-2">
           <input
             type="email"
             placeholder="Enter email address"
-            className="border p-2 rounded-md w-full bg-transparent outline-none"
+            className="border p-2 rounded-md w-full bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             value={currentEmail}
             onChange={(e) => setCurrentEmail(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={addCurrentEmailToList}
           />
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             type="button"
-            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition flex-shrink-0 w-full md:w-auto"
             onClick={addCurrentEmailToList}
           >
             Add
-          </button>
+          </motion.button>
         </div>
 
-        <button
-          className="p-2 disabled:bg-gray-300 bg-primary text-white hover:bg-blue-600 w-full mt-2 rounded-md flex justify-center"
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          className="p-2 disabled:bg-gray-300 bg-primary text-white hover:bg-blue-600 w-full mt-4 rounded-md flex justify-center items-center gap-2 transition"
           onClick={SendEmail}
-          // ✅ 2. UPDATE THE DISABLED LOGIC
-          // The button is enabled if the list is not empty OR if a valid email is currently typed.
           disabled={loading || (emails.length === 0 && !isValidEmail(currentEmail))}
         >
           {loading ? <ClipLoader size={20} color={"#ffffff"} /> : "Send Email(s)"}
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
