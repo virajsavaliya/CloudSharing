@@ -1,15 +1,14 @@
-// app/api/send/route.ts
+// File: app/api/send/route.ts
 
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { EmailTemplate } from '../../_components/email-template';
 
-// Ensure this transport is configured correctly.
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS, // Must be the 16-digit App Password
+    pass: process.env.GMAIL_PASS,
   },
 });
 
@@ -21,18 +20,23 @@ export async function POST(req) {
       from: `CloudShare <${process.env.GMAIL_USER}>`,
       to: response.emailToSend,
       subject: `${response.userName} shared a file with you`,
-      html: EmailTemplate({ response }), // Using your hardened template logic
+      html: EmailTemplate({ response }),
     };
 
-    // This "await" is necessary for reliability.
-    // It tells the server to wait until Google confirms the email is sent.
-    // This is the direct cause of the slowness.
-    const info = await transporter.sendMail(mailOptions);
+    // Send the email without waiting for confirmation
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Nodemailer error:", error);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
 
-    return NextResponse.json(info);
+    // Return an immediate success response to the client
+    return NextResponse.json({ success: true, message: "Email sent successfully in the background." });
 
   } catch (error) {
-    // If Google's server fails or times out, the error will be caught here.
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("API POST error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
