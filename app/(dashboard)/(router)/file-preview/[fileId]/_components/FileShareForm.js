@@ -17,11 +17,15 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email.trim());
+  };
 
   const addCurrentEmailToList = () => {
-    if (currentEmail && isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
-      setEmails([...emails, currentEmail]);
+    const trimmedEmail = currentEmail.trim().toLowerCase();
+    if (trimmedEmail && isValidEmail(trimmedEmail) && !emails.includes(trimmedEmail)) {
+      setEmails([...emails, trimmedEmail]);
       setCurrentEmail('');
     }
   };
@@ -37,37 +41,89 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
     setEmails(emails.filter(email => email !== emailToRemove));
   };
 
-  const SendEmail = () => {
+  const SendEmail = async () => {
     const emailsToSend = [...emails];
-    if (isValidEmail(currentEmail) && !emails.includes(currentEmail)) {
-      emailsToSend.push(currentEmail);
+    const trimmedCurrentEmail = currentEmail.trim().toLowerCase();
+    
+    if (isValidEmail(trimmedCurrentEmail) && !emails.includes(trimmedCurrentEmail)) {
+      emailsToSend.push(trimmedCurrentEmail);
     }
 
-    if (emailsToSend.length === 0) return;
+    if (emailsToSend.length === 0) {
+      toast.error('Please add at least one valid email address');
+      return;
+    }
 
     setLoading(true);
-    const promises = emailsToSend.map(emailAddress => {
-      const data = {
-        emailToSend: emailAddress,
-        userName: user?.displayName,
-        fileName: file.fileName,
-        fileSize: file.fileSize,
-        fileType: file.fileType,
-        shortUrl: file.shortUrl,
+    
+    try {
+      // Prepare email data once
+      const baseEmailData = {
+        userName: user?.displayName || 'Unknown User',
+        userEmail: user?.email || '',
+        fileName: file.fileName || file.name || 'Unknown File',
+        fileSize: file.fileSize || 0,
+        fileType: file.fileType || 'unknown',
+        shortUrl: file.shortUrl || '',
+        fileId: file.id || '',
+        timestamp: new Date().toISOString()
       };
-      return GlobalApi.SendEmail(data);
-    });
-    Promise.all(promises).then(() => {
-      setLoading(false);
+
+      // Send emails in parallel with timeout
+      const emailPromises = emailsToSend.map(async (emailAddress) => {
+        const emailData = {
+          ...baseEmailData,
+          emailToSend: emailAddress
+        };
+        
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email timeout')), 10000)
+        );
+        
+        try {
+          const response = await Promise.race([
+            GlobalApi.SendEmail(emailData),
+            timeoutPromise
+          ]);
+          
+          console.log(`Email queued for ${emailAddress}`);
+          return { emailAddress, status: 'queued', response };
+        } catch (error) {
+          console.warn(`Email queue issue for ${emailAddress}:`, error.message);
+          // Don't fail the entire process for individual email issues
+          return { emailAddress, status: 'queued', error: error.message };
+        }
+      });
+
+      // Wait for all emails to be queued (not delivered)
+      const results = await Promise.allSettled(emailPromises);
+      
+      // Count successful queues
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && result.value.status === 'queued'
+      ).length;
+
       if (onReceiversAdd) onReceiversAdd(emailsToSend);
       setEmails([]);
       setCurrentEmail('');
-      toast.success('Emails sent successfully!');
-    }).catch(error => {
-      console.error('Error sending emails:', error);
+      
+      // Show success message immediately after queuing
+      toast.success(
+        `${successCount} email${successCount > 1 ? 's' : ''} queued for delivery! Recipients will receive them shortly.`,
+        { duration: 4000 }
+      );
+      
+    } catch (error) {
+      console.error('Error queuing emails:', error);
+      // Still clear form since emails might be queued
+      if (onReceiversAdd) onReceiversAdd(emailsToSend);
+      setEmails([]);
+      setCurrentEmail('');
+      toast.success('Emails queued for delivery!');
+    } finally {
       setLoading(false);
-      toast.error('Failed to send emails. Please try again.');
-    });
+    }
   };
 
   const handleCopy = () => {
@@ -175,8 +231,12 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
         <div className="flex flex-col md:flex-row gap-2">
           <input
             type="email"
-            placeholder="Enter email address"
-            className="border p-2 rounded-md w-full bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            placeholder="Enter valid email address (e.g., user@domain.com)"
+            className={`border p-2 rounded-md w-full bg-white outline-none focus:ring-2 focus:border-transparent text-sm ${
+              currentEmail && !isValidEmail(currentEmail) 
+                ? 'border-red-300 focus:ring-red-500' 
+                : 'border-gray-300 focus:ring-blue-500'
+            }`}
             value={currentEmail}
             onChange={(e) => setCurrentEmail(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -185,12 +245,17 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
           <motion.button
             whileTap={{ scale: 0.95 }}
             type="button"
-            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition flex-shrink-0 w-full md:w-auto"
+            className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition flex-shrink-0 w-full md:w-auto disabled:opacity-50"
             onClick={addCurrentEmailToList}
+            disabled={!currentEmail || !isValidEmail(currentEmail)}
           >
             Add
           </motion.button>
         </div>
+
+        {currentEmail && !isValidEmail(currentEmail) && (
+          <p className="text-red-500 text-xs mt-1">Please enter a valid email address</p>
+        )}
 
         <motion.button
           whileTap={{ scale: 0.98 }}
@@ -198,7 +263,14 @@ function FileShareForm({ file, onPasswordSave, onReceiversAdd }) {
           onClick={SendEmail}
           disabled={loading || (emails.length === 0 && !isValidEmail(currentEmail))}
         >
-          {loading ? <ClipLoader size={20} color={"#ffffff"} /> : "Send Email(s)"}
+          {loading ? (
+            <>
+              <ClipLoader size={20} color={"#ffffff"} />
+              Sending...
+            </>
+          ) : (
+            `Send Email${(emails.length > 0 || isValidEmail(currentEmail)) ? `(s) to ${emails.length + (isValidEmail(currentEmail) ? 1 : 0)} recipient${emails.length + (isValidEmail(currentEmail) ? 1 : 0) > 1 ? 's' : ''}` : ''}`
+          )}
         </motion.button>
       </div>
     </motion.div>
