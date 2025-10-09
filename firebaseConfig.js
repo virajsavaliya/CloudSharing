@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { getStorage, ref, deleteObject } from "firebase/storage";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -20,8 +20,27 @@ const firebaseConfig = {
 
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+
+// Initialize Firestore with modern cache configuration
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+} catch (error) {
+  // Already initialized
+  db = getFirestore(app);
+}
+
+const storage = getStorage(app);
+
+// Configure storage with custom settings
+storage.maxUploadRetryTime = 120000; // 2 minutes
+storage.maxOperationRetryTime = 120000;
+
+export { db, storage };
 
 /**
  * Custom event emitter for file-related events.
@@ -207,6 +226,9 @@ export const deleteUserFromAuth = async (uid) => {
     // This code must run on your server (Node.js) with Firebase Admin SDK:
     // const admin = require("firebase-admin");
     // await admin.auth().deleteUser(uid);
+    // For client-side, you cannot delete other users from Auth.
+    throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
+};
     // For client-side, you cannot delete other users from Auth.
     throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
 };
