@@ -1,8 +1,9 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -19,7 +20,10 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-export const app = initializeApp(firebaseConfig);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+
+// Initialize Auth
+const auth = getAuth(app);
 
 // Initialize Firestore with modern cache configuration
 let db;
@@ -34,13 +38,14 @@ try {
   db = getFirestore(app);
 }
 
+// Initialize Storage
 const storage = getStorage(app);
 
 // Configure storage with custom settings
 storage.maxUploadRetryTime = 120000; // 2 minutes
 storage.maxOperationRetryTime = 120000;
 
-export { db, storage };
+export { app, auth, db, storage };
 
 /**
  * Custom event emitter for file-related events.
@@ -223,13 +228,10 @@ export const sendResetPasswordEmail = async (email) => {
  */
 // This function is for reference. You must call this from a server-side API route using Firebase Admin SDK.
 export const deleteUserFromAuth = async (uid) => {
-    // This code must run on your server (Node.js) with Firebase Admin SDK:
-    // const admin = require("firebase-admin");
-    // await admin.auth().deleteUser(uid);
-    // For client-side, you cannot delete other users from Auth.
-    throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
-};
-    // For client-side, you cannot delete other users from Auth.
-    throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
+    if (typeof window !== 'undefined') {
+        throw new Error("deleteUserFromAuth must be called server-side with Firebase Admin SDK.");
+    }
+    // This should only be called from API routes with admin SDK
+    throw new Error("Use Firebase Admin SDK on server side");
 };
 
