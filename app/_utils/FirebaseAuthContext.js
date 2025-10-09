@@ -1,13 +1,49 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { getAuth, onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut as firebaseSignOut, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { app } from "../../firebaseConfig";
 
 const AuthContext = createContext();
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const lastActivityRef = useRef(Date.now());
+  const activityTimeoutRef = useRef(null);
+
+  const updateUserActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    // Clear existing timeout
+    if (activityTimeoutRef.current) {
+      clearTimeout(activityTimeoutRef.current);
+    }
+
+    // Set new timeout
+    activityTimeoutRef.current = setTimeout(() => {
+      logout();
+    }, SESSION_TIMEOUT);
+  }, []);
+
+  useEffect(() => {
+    // Add activity listeners
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const handleActivity = () => updateUserActivity();
+    
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+      if (activityTimeoutRef.current) {
+        clearTimeout(activityTimeoutRef.current);
+      }
+    };
+  }, [updateUserActivity]);
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -57,7 +93,8 @@ export function AuthProvider({ children }) {
       user, 
       loading, 
       logout,
-      sessionTimeLeft: user ? Math.max(0, SESSION_TIMEOUT - (Date.now() - lastActivityRef.current)) : 0
+      sessionTimeLeft: user ? Math.max(0, SESSION_TIMEOUT - (Date.now() - lastActivityRef.current)) : 0,
+      updateUserActivity
     }}>
       {children}
     </AuthContext.Provider>
