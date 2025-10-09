@@ -9,13 +9,13 @@ import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyDVMyUGspuZLwjckqv1sb9CpBg3xXkQ56g",
-  authDomain: "file-sharing-app-c63a0.firebaseapp.com",
-  projectId: "file-sharing-app-c63a0",
-  storageBucket: "file-sharing-app-c63a0.appspot.com",
-  messagingSenderId: "616447313925",
-  appId: "1:616447313925:web:db692a9c95ae28f17df46c",
-  measurementId: "G-F5G183J837"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

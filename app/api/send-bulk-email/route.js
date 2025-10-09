@@ -13,20 +13,28 @@ export async function POST(request) {
       
       const batchPromises = batch.map(async (email) => {
         try {
-          // Your existing email sending logic here
-          const response = await sendEmailFunction({
-            ...emailData,
-            emailToSend: email
+          // Send email through the /api/send endpoint
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...emailData,
+              emailToSend: email
+            })
           });
           
-          return { email, status: 'sent', response };
+          const result = await response.json();
+          
+          return { email, status: result.success ? 'sent' : 'failed', response: result };
         } catch (error) {
           return { email, status: 'failed', error: error.message };
         }
       });
       
       const batchResults = await Promise.allSettled(batchPromises);
-      results.push(...batchResults);
+      results.push(...batchResults.map(r => r.value));
       
       // Small delay between batches to prevent rate limiting
       if (i + batchSize < emails.length) {
@@ -34,10 +42,12 @@ export async function POST(request) {
       }
     }
     
+    const totalSent = results.filter(r => r.status === 'sent').length;
+    
     return NextResponse.json({
       success: true,
       results,
-      totalSent: results.filter(r => r.value?.status === 'sent').length
+      totalSent
     });
     
   } catch (error) {

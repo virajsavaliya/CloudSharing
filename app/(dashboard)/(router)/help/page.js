@@ -2,19 +2,24 @@
 import React from "react";
 import HelpPage from "./_components/HelpPage";
 import Link from "next/link";
+import Head from "next/head";
 
 function Help() {
   const HelpTitle = () => (
-    <div className="text-center mb-8 mt-10">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">FAQ</h1>
-      <hr className="border-b-2 border-gray-300 w-16 mx-auto mt-2" />
+    <div className="text-center my-10 md:my-16 px-4">
+      <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
+        Frequently Asked Questions
+      </h1>
+      <p className="text-base sm:text-xl text-gray-600 max-w-2xl mx-auto">
+        Find answers to common questions about our features, support, and pricing.
+      </p>
     </div>
   );
 
   const NavLocation = () => (
-    <div className="md:block">
+    <div className="block mt-4 sm:mt-8 ml-4 sm:ml-8">
       <nav aria-label="Breadcrumb">
-        <ol className="flex items-center gap-1 text-sm text-gray-600">
+        <ol className="flex items-center gap-1 text-sm text-gray-500">
           <li>
             <Link href="/" className="block transition hover:text-gray-700">
               <span className="sr-only"> Home </span>
@@ -49,26 +54,7 @@ function Help() {
             </svg>
           </li>
           <li>
-            <Link href="/upload" className="block transition hover:text-gray-700">
-              Upload
-            </Link>
-          </li>
-          <li className="rtl:rotate-180">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </li>
-          <li>
-            <a href="#" className="block transition hover:text-gray-700">
+            <a href="#" className="block transition font-bold text-gray-700">
               Help
             </a>
           </li>
@@ -78,11 +64,17 @@ function Help() {
   );
 
   return (
-    <div className="p-5 px-4 sm:px-6 md:px-8">
-      <NavLocation />
-      <HelpTitle />
-      <HelpPage />
-    </div>
+    <>
+      <Head>
+        <title>Help & FAQ | Cloudsharing</title>
+        <meta name="description" content="Find answers to frequently asked questions about file sharing, features, and support on our help page." />
+      </Head>
+      <div className="bg-gray-50 min-h-screen">
+        <NavLocation />
+        <HelpTitle />
+        <HelpPage />
+      </div>
+    </>
   );
 }
 

@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../../../_utils/FirebaseAuthContext";
-import { db } from "../../../../../firebaseConfig";
+import { db } from "../../../../../firebaseConfig.js";
 import { collection, getDocs, query, where, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import StorageUsage from "../../../../_components/StorageUsage";
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -414,7 +415,9 @@ function FilesPage({ searchQuery, setSearchQuery }) {
             </div>
           </div>
         </div>
-        {/* Add more stats as needed */}
+        <div className="md:col-span-2">
+          <StorageUsage userId={user.email} userPlan={user.plan || 'FREE'} />
+        </div>
       </div>
 
       {/* Quick Access */}

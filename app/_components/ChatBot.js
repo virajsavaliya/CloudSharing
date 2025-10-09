@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Bot, User, RotateCcw, Copy, ThumbsUp, ThumbsDown, ArrowLeft, Clock } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, User, RotateCcw, Copy, ThumbsUp, ThumbsDown, ArrowLeft, Clock, Mic, MicOff } from 'lucide-react';
 import Image from 'next/image';
 import { getGeminiResponse } from '../_utils/geminiApi';
 
@@ -121,7 +121,10 @@ export default function ChatBot() {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const messagesEndRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   // Add new state for reactions
   const [messageReactions, setMessageReactions] = useState({});
@@ -139,6 +142,54 @@ export default function ChatBot() {
     const savedHistory = localStorage.getItem('chatHistory');
     if (savedHistory) {
       setConversationHistory(JSON.parse(savedHistory));
+    }
+
+    // Initialize speech recognition
+    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        console.log('Speech recognition started');
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+
+        setInput(transcript);
+        
+        // Only send if it's a final result
+        if (event.results[0].isFinal) {
+          handleSend(transcript);
+          setIsListening(false);
+          recognition.stop();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Please allow microphone access to use voice input.');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        console.log('Speech recognition ended');
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      setVoiceSupported(true);
+    } else {
+      setVoiceSupported(false);
     }
   }, []);
 
@@ -200,10 +251,11 @@ export default function ChatBot() {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (voiceInput) => {
+    const textToSend = voiceInput || input;
+    if (!textToSend.trim()) return;
 
-    const userMessage = { text: input, sender: 'user', timestamp: new Date() };
+    const userMessage = { text: textToSend, sender: 'user', timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
@@ -424,19 +476,53 @@ export default function ChatBot() {
             </div>
           </div>
 
-          {/* Remove old typing indicator from input area */}
+          {/* Input area with voice support */}
           <div className="p-4 border-t">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Type your question..."
-                className="flex-1 p-2 outline-none text-gray-700 placeholder-gray-400"
+                placeholder={isListening ? 'Listening...' : 'Type your question...'}
+                className="flex-1 p-2 outline-none text-gray-700 placeholder-gray-400 rounded-lg border focus:border-blue-500 transition-colors"
               />
+              {voiceSupported && (
+                <button
+                  onClick={() => {
+                    try {
+                      if (isListening) {
+                        recognitionRef.current?.stop();
+                      } else {
+                        // Reset input when starting new recording
+                        setInput('');
+                        // Request microphone permission before starting
+                        navigator.mediaDevices.getUserMedia({ audio: true })
+                          .then(() => {
+                            recognitionRef.current?.start();
+                          })
+                          .catch((err) => {
+                            console.error('Microphone permission denied:', err);
+                            alert('Please allow microphone access to use voice input.');
+                          });
+                      }
+                    } catch (error) {
+                      console.error('Speech recognition error:', error);
+                      setIsListening(false);
+                    }
+                  }}
+                  className={`p-2 rounded-full transition-colors ${
+                    isListening 
+                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                  }`}
+                  title={isListening ? 'Stop recording' : 'Start voice input'}
+                >
+                  {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                </button>
+              )}
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!input.trim()}
                 className="p-2"
               >
@@ -446,6 +532,11 @@ export default function ChatBot() {
                 />
               </button>
             </div>
+            {isListening && (
+              <div className="text-xs text-center mt-2 text-gray-500">
+                Speak now... Click the microphone icon when you're done.
+              </div>
+            )}
           </div>
         </div>
       </div>

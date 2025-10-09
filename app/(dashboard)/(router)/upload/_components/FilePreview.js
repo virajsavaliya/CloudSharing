@@ -18,9 +18,9 @@ const extToIcon = {
   pdf: "pdf.svg",
 
   // archives
-  zip: "zip.svg",
-  rar: "zip.svg",
-  "7z": "zip.svg",
+  zip: "archive.svg",
+  rar: "archive.svg",
+  "7z": "archive.svg",
 
   // images
   png: "image.svg",

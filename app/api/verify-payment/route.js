@@ -35,12 +35,32 @@ export async function POST(req) {
     const paymentRef = adminDb.collection('paymentHistory').doc(order_id);
     const finalStatus = cashfreeOrder.order_status === 'PAID' ? 'SUCCESS' : 'FAILED';
     
-    // ✅ Add fallback values to prevent undefined errors
+    // First, get the payment record to access user info and plan details
+    const paymentDoc = await paymentRef.get();
+    if (!paymentDoc.exists) {
+      throw new Error("Payment record not found");
+    }
+    const paymentData = paymentDoc.data();
+    
+    // Update payment record
     await paymentRef.update({
       status: finalStatus,
       transactionId: cashfreeOrder.cf_order_id ?? 'N/A',
       paymentMethod: cashfreeOrder.order_payment_method ?? 'N/A',
+      updatedAt: adminDb.FieldValue.serverTimestamp()
     });
+
+    // If payment is successful, update user subscription
+    if (finalStatus === 'SUCCESS') {
+      await adminDb.collection('userSubscriptions').doc(paymentData.userId).set({
+        plan: paymentData.plan,
+        duration: paymentData.duration,
+        userId: paymentData.userId,
+        userEmail: paymentData.userEmail,
+        updatedAt: adminDb.FieldValue.serverTimestamp(),
+        paymentId: order_id
+      }, { merge: true });
+    }
 
     // --- 3. Return the Updated Record to the Frontend ---
     const updatedDoc = await paymentRef.get();

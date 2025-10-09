@@ -8,8 +8,8 @@ const nextConfig = {
         hostname: '**',
       },
     ],
-    unoptimized: true
   },
+  optimizeFonts: false, // Disable automatic font optimization
   devIndicators: {
     autoPrerender: false,
   },

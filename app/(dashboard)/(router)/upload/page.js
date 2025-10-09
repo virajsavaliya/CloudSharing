@@ -12,6 +12,7 @@ import {
 import { doc, getFirestore, setDoc, getDoc } from "firebase/firestore";
 import { generateRandomString } from "../../../_utils/GenerateRandomString";
 import { app } from "../../../../firebaseConfig";
+import { STORAGE_PLANS } from "../../../_utils/StorageConfig";
 import Image from 'next/image'
 
 function Upload() {
@@ -21,6 +22,7 @@ function Upload() {
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("Free");
+  const [normalizedPlan, setNormalizedPlan] = useState("Free");
 
   const storage = getStorage(app);
   const db = getFirestore(app);
@@ -37,7 +39,10 @@ function Upload() {
       try {
         const userSubDoc = await getDoc(doc(db, "userSubscriptions", user.uid));
         if (userSubDoc.exists()) {
-          setCurrentPlan(userSubDoc.data().plan);
+          const planFromDB = userSubDoc.data().plan;
+          setCurrentPlan(planFromDB);
+          // Normalize plan name
+          setNormalizedPlan(planFromDB.charAt(0).toUpperCase() + planFromDB.slice(1).toLowerCase());
         }
       } catch (error) {
         console.error("Error fetching user plan:", error);
@@ -47,14 +52,13 @@ function Upload() {
   }, [user, db]);
 
   const getFileSizeLimit = () => {
-    switch (currentPlan) {
-      case "Premium":
-        return Infinity;
-      case "Pro":
-        return 2 * 1024 * 1024 * 1024; // 2GB
-      default:
-        return 50 * 1024 * 1024; // 50MB
-    }
+    // Convert plan names to uppercase for consistency
+    const upperPlan = normalizedPlan.toUpperCase();
+    const upperCurrentPlan = currentPlan.toUpperCase();
+    
+    // Try to get the plan in order of preference
+    const plan = STORAGE_PLANS[upperPlan] || STORAGE_PLANS[upperCurrentPlan] || STORAGE_PLANS.FREE;
+    return plan.maxStorage;
   };
 
   const uploadFiles = async (files, title, notes, receivers = []) => { // Update function signature
@@ -75,7 +79,20 @@ function Upload() {
       const file = files[0];
       const docId = generateRandomString();
       const storageRef = ref(storage, `file-upload/${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      // Set metadata with owner
+      const metadata = {
+        contentType: file.type,
+        customMetadata: {
+          owner: user.email,
+          sharedWith: receivers.length > 0 ? JSON.stringify(receivers.reduce((acc, email) => {
+            acc[email] = true;
+            return acc;
+          }, {})) : ''
+        }
+      };
+
+      const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
       uploadTask.on(
         "state_changed",
@@ -98,7 +115,7 @@ function Upload() {
             fileUrl: fileUrl,
             userEmail: user?.email,
             userName: user?.displayName,
-            shortUrl: process.env.NEXT_PUBLIC_BASE_URL + docId,
+            shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/f/${docId}`,
             createdAt: new Date(),
             receivers,
           });
@@ -116,7 +133,20 @@ function Upload() {
 
       for (const file of files) {
         const storageRef = ref(storage, folderRef + file.name);
-        const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        // Set metadata with owner for each file
+        const metadata = {
+          contentType: file.type,
+          customMetadata: {
+            owner: user.email,
+            sharedWith: receivers.length > 0 ? JSON.stringify(receivers.reduce((acc, email) => {
+              acc[email] = true;
+              return acc;
+            }, {})) : ''
+          }
+        };
+
+        const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
         await new Promise((resolve, reject) => {
           const unsubscribe = uploadTask.on(
@@ -155,7 +185,7 @@ function Upload() {
         files: uploadedFiles,
         userEmail: user?.email,
         userName: user?.displayName,
-        shortUrl: process.env.NEXT_PUBLIC_BASE_URL + folderId,
+        shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/f/${folderId}`,
         createdAt: new Date(),
         receivers,
       });
