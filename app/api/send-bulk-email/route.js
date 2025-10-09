@@ -4,50 +4,57 @@ export async function POST(request) {
   try {
     const { emails, emailData } = await request.json();
     
-    // Process emails in batches of 5 to avoid overwhelming the server
-    const batchSize = 5;
-    const results = [];
-    
-    for (let i = 0; i < emails.length; i += batchSize) {
-      const batch = emails.slice(i, i + batchSize);
-      
-      const batchPromises = batch.map(async (email) => {
-        try {
-          // Send email through the /api/send endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...emailData,
-              emailToSend: email
-            })
-          });
-          
-          const result = await response.json();
-          
-          return { email, status: result.success ? 'sent' : 'failed', response: result };
-        } catch (error) {
-          return { email, status: 'failed', error: error.message };
-        }
-      });
-      
-      const batchResults = await Promise.allSettled(batchPromises);
-      results.push(...batchResults.map(r => r.value));
-      
-      // Small delay between batches to prevent rate limiting
-      if (i + batchSize < emails.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    // Validate input
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid emails array' },
+        { status: 400 }
+      );
     }
+
+    // Process all emails concurrently with Promise.all for maximum speed
+    // The connection pooling in /api/send will handle rate limiting
+    const emailPromises = emails.map(async (email) => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...emailData,
+            emailToSend: email
+          })
+        });
+        
+        const result = await response.json();
+        
+        return { 
+          email, 
+          status: result.success ? 'sent' : 'failed', 
+          message: result.message || result.error 
+        };
+      } catch (error) {
+        return { 
+          email, 
+          status: 'failed', 
+          error: error.message 
+        };
+      }
+    });
+    
+    // Wait for all emails to be dispatched (not necessarily sent, as /api/send returns immediately)
+    const results = await Promise.all(emailPromises);
     
     const totalSent = results.filter(r => r.status === 'sent').length;
+    const totalFailed = results.filter(r => r.status === 'failed').length;
     
     return NextResponse.json({
       success: true,
       results,
-      totalSent
+      totalSent,
+      totalFailed,
+      message: `Dispatched ${totalSent} emails successfully, ${totalFailed} failed`
     });
     
   } catch (error) {

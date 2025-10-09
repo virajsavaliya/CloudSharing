@@ -4,12 +4,18 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { EmailTemplate } from '../../_components/email-template';
 
+// Create transporter with connection pooling for better performance
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS,
   },
+  pool: true, // Enable connection pooling
+  maxConnections: 5, // Maximum concurrent connections
+  maxMessages: 100, // Maximum messages per connection
+  rateDelta: 1000, // Time window for rate limiting (1 second)
+  rateLimit: 5, // Maximum messages per rateDelta
 });
 
 export async function POST(req) {
@@ -23,14 +29,14 @@ export async function POST(req) {
       html: EmailTemplate({ response }),
     };
 
-    // Send the email without waiting for confirmation
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
+    // Use promise-based sending for better async handling
+    transporter.sendMail(mailOptions)
+      .then((info) => {
+        console.log("Email sent:", info.messageId);
+      })
+      .catch((error) => {
         console.error("Nodemailer error:", error);
-      } else {
-        console.log("Email sent:", info.response);
-      }
-    });
+      });
 
     // Return an immediate success response to the client
     return NextResponse.json({ success: true, message: "Email sent successfully in the background." });

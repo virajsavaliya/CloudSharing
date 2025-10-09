@@ -1,33 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User subscriptions
-    match /userSubscriptions/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Allow everything (read/write) on all documents — ⚠️ Only for testing
+    match /{document=**} {
+      allow read, write: if true;
     }
-    
+
     // File uploads - Allow authenticated users to read/write their own files
     match /files/{fileId} {
       allow read: if true; // Public read access for file sharing
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-                               (resource.data.userId == request.auth.uid);
+      allow update, delete: if request.auth != null &&
+                              resource.data.userId == request.auth.uid;
     }
-    
+
     // Payment transactions
     match /payments/{paymentId} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
                      resource.data.userId == request.auth.uid;
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
+      allow update: if request.auth != null &&
                        resource.data.userId == request.auth.uid;
     }
-    
+
     // User data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null &&
+                           request.auth.uid == userId;
     }
-    
+
     // Allow public read for shared files metadata
     match /sharedFiles/{fileId} {
       allow read: if true;
