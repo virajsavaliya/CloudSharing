@@ -3,42 +3,42 @@ export const getFileIcon = (file) => {
   const fileType = typeof file === 'string' ? file : file?.fileType;
 
   // Handle folders
-  if (file?.type === 'folder') return '/public/icons/folder.svg';
+  if (file?.type === 'folder') return '/icons/folder.svg';
 
   // If no valid fileType, return default
-  if (!fileType || typeof fileType !== 'string') return '/public/icons/file.svg';
+  if (!fileType || typeof fileType !== 'string') return '/icons/file.svg';
 
   // Images
-  if (fileType.includes('image/')) return '/public/icons/image.svg';
+  if (fileType.includes('image/')) return '/icons/image.svg';
   
   // Videos
-  if (fileType.includes('video/')) return '/public/icons/video.svg';
+  if (fileType.includes('video/')) return '/icons/video.svg';
   
   // Audio
-  if (fileType.includes('audio/')) return '/public/icons/audio.svg';
+  if (fileType.includes('audio/')) return '/icons/audio.svg';
 
   // Documents
-  if (fileType.includes('application/pdf')) return '/public/icons/pdf.svg';
+  if (fileType.includes('application/pdf')) return '/icons/pdf.svg';
   if (fileType.includes('application/msword') || 
       fileType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-    return '/public/icons/word.svg';
+    return '/icons/word.svg';
   }
   if (fileType.includes('application/vnd.ms-excel') || 
       fileType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-    return '/public/icons/excel.svg';
+    return '/icons/excel.svg';
   }
   if (fileType.includes('application/vnd.ms-powerpoint') || 
       fileType.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
-    return '/public/icons/powerpoint.svg';
+    return '/icons/powerpoint.svg';
   }
 
   // Archives
   if (fileType.includes('application/zip') || 
       fileType.includes('application/x-rar-compressed') ||
       fileType.includes('application/x-7z-compressed')) {
-    return '/public/icons/archive.svg';
+    return '/icons/archive.svg';
   }
 
   // Default
-  return '/public/icons/file.svg';
+  return '/icons/file.svg';
 };

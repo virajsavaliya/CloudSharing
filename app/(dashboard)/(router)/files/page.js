@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import FilesPage from "./_components/FilesPage";
 import { useAuth } from "../../../_utils/FirebaseAuthContext";
@@ -27,12 +27,10 @@ function Files() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <Suspense fallback={<div>Loading...</div>}>
-        <FilesPage 
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-        />
-      </Suspense>
+      <FilesPage 
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
     </div>
   );
 }
