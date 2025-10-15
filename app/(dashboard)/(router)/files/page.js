@@ -20,7 +20,7 @@ function Files() {
   if (loading || !user) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Image src="/loader.gif" alt="Loading..." width={350} height={350} />
+        <Image src="/loader.gif" alt="Loading..." width={350} height={350} unoptimized />
       </div>
     );
   }

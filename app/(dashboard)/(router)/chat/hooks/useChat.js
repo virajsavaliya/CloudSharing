@@ -63,8 +63,10 @@ export const useChat = (myChatId, selectedUser) => {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || !myChatId || !selectedUser) return;
+  const sendMessage = async (audioData = null, messageType = 'text') => {
+    if (messageType === 'text' && !input.trim()) return;
+    if (messageType === 'audio' && !audioData) return;
+    if (!myChatId || !selectedUser) return;
 
     const auth = getAuth();
     const user = auth.currentUser;
@@ -76,32 +78,33 @@ export const useChat = (myChatId, selectedUser) => {
 
     const chatId = [myChatId, selectedUser.chatId].sort().join('_');
     const timestamp = new Date().toISOString();
-    
+
     // **THE FIX IS HERE**: Ensure the senderId is always the logged-in user's ID
-    const messageData = { 
+    const messageData = {
       senderId: myChatId, // Use myChatId to guarantee it matches the authenticated user
-      message: input.trim(),
-      timestamp: timestamp 
+      message: messageType === 'text' ? input.trim() : audioData,
+      messageType: messageType, // Add message type
+      timestamp: timestamp
     };
-    
-    const optimisticMessage = { 
-      ...messageData, 
-      id: Date.now().toString(), 
-      status: 'sending' 
+
+    const optimisticMessage = {
+      ...messageData,
+      id: Date.now().toString(),
+      status: 'sending'
     };
-    
+
     setMessages(prev => [...prev, optimisticMessage]);
-    const messageToSend = input;
-    setInput("");
-    
+    const messageToSend = messageType === 'text' ? input : audioData;
+    if (messageType === 'text') setInput("");
+
     try {
       const channel = ablyClient.channels.get(chatId);
       await channel.publish('chat-message', messageData);
 
       const receiverPrivateChannel = ablyClient.channels.get(`private-${selectedUser.chatId}`);
-      await receiverPrivateChannel.publish('new-message-ping', { 
+      await receiverPrivateChannel.publish('new-message-ping', {
           from: myChatId,
-          message: messageToSend.trim()
+          message: messageType === 'text' ? messageToSend.trim() : '🎵 Audio message'
       });
 
       const response = await fetch('/api/chat', {
@@ -117,13 +120,13 @@ export const useChat = (myChatId, selectedUser) => {
         throw new Error("Failed to send message to server");
       }
 
-      setMessages(prev => prev.map(m => 
+      setMessages(prev => prev.map(m =>
         m.id === optimisticMessage.id ? { ...m, status: 'sent' } : m
       ));
 
     } catch (error) {
       console.error("Failed to send message:", error);
-      setInput(messageToSend);
+      if (messageType === 'text') setInput(messageToSend);
       setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
     }
   };

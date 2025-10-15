@@ -15,6 +15,18 @@ setInterval(() => {
 }, 60000)
 
 export async function middleware(request: NextRequest) {
+    // Handle missing ReactToastify source maps to prevent 404 errors
+  if (request.nextUrl.pathname.includes('ReactToastify.css.map') ||
+      request.nextUrl.pathname.includes('react-toastify.esm.mjs.map')) {
+    return new NextResponse('{"version":3,"sources":[],"names":[],"mappings":"","file":""}', {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+  }
+
   // Basic security headers
   const headers = new Headers({
     'X-DNS-Prefetch-Control': 'on',
@@ -66,12 +78,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * 1. /api/auth/* (authentication routes)
-     * 2. /_next/* (Next.js internals)
-     * 3. /*.* (static files)
+     * Match all request paths including _next static files for source maps
      */
-    '/((?!api/auth|_next|[\\w-]+\\.\\w+).*)',
-    '/api/((?!auth).*)'
+    '/:path*'
   ],
 }

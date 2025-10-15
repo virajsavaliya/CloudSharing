@@ -251,7 +251,8 @@ function Recycle() {
               alt="Loading..." 
               width={350}
               height={350}
-              className="w-100 h-100" 
+              className="w-100 h-100"
+              unoptimized
             />
           </div>
     );

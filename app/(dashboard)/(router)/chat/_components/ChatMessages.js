@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import UserAvatar from "./UserAvatar";
 import Image from "next/image";
-import { Trash2, ChevronDown, Clock, CheckCheck } from 'lucide-react';
+import { Trash2, ChevronDown, Clock, CheckCheck, Play, Pause, Volume2, Download } from 'lucide-react';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 const formatDateSeparator = (dateString) => {
@@ -20,7 +20,129 @@ const formatDateSeparator = (dateString) => {
     return format(date, 'MMMM d, yyyy');
 };
 
+// Audio Message Component
+const AudioMessage = ({ audioData, isSender }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const audioRef = useRef(null);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && audioBlob) {
+      const blobUrl = URL.createObjectURL(audioBlob);
+      audio.src = blobUrl;
+
+      const updateTime = () => setCurrentTime(audio.currentTime);
+      const updateDuration = () => {
+        setDuration(audio.duration);
+        setIsLoading(false);
+      };
+      const handleEnded = () => setIsPlaying(false);
+      const handleError = () => {
+        setIsLoading(false);
+        console.error('Audio loading error');
+      };
+
+      audio.addEventListener('timeupdate', updateTime);
+      audio.addEventListener('loadedmetadata', updateDuration);
+      audio.addEventListener('ended', handleEnded);
+      audio.addEventListener('error', handleError);
+
+      return () => {
+        audio.removeEventListener('timeupdate', updateTime);
+        audio.removeEventListener('loadedmetadata', updateDuration);
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('error', handleError);
+        URL.revokeObjectURL(blobUrl);
+      };
+    }
+  }, [audioBlob]);
+
+  const downloadAudio = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(audioData);
+      if (!response.ok) {
+        throw new Error('Failed to download audio');
+      }
+
+      const blob = await response.blob();
+      setAudioBlob(blob);
+    } catch (error) {
+      console.error('Error downloading audio:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const togglePlay = () => {
+    if (!audioBlob && !isLoading) {
+      downloadAudio();
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (audio && !isLoading && audioBlob) {
+      if (isPlaying) {
+        audio.pause();
+      } else {
+        audio.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-lg min-w-[200px] ${
+      isSender ? 'bg-blue-600' : 'bg-gray-300'
+    }`}>
+      <button
+        onClick={togglePlay}
+        disabled={isLoading}
+        className={`p-2 rounded-full transition-colors ${
+          isLoading
+            ? 'bg-gray-400 cursor-not-allowed'
+            : isSender
+              ? 'bg-blue-700 hover:bg-blue-800'
+              : 'bg-gray-400 hover:bg-gray-500'
+        }`}
+      >
+        {isLoading ? (
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        ) : !audioBlob ? (
+          <Download className={`w-4 h-4 ${isSender ? 'text-white' : 'text-gray-800'}`} />
+        ) : isPlaying ? (
+          <Pause className={`w-4 h-4 ${isSender ? 'text-white' : 'text-gray-800'}`} />
+        ) : (
+          <Play className={`w-4 h-4 ${isSender ? 'text-white' : 'text-gray-800'}`} />
+        )}
+      </button>
+
+      <div className="flex-1">
+        <div className={`flex items-center gap-2 mb-1 ${
+          isSender ? 'text-blue-100' : 'text-gray-700'
+        }`}>
+          <Volume2 className="w-3 h-3" />
+          <span className="text-xs font-medium">Audio Message</span>
+        </div>
+        <div className={`text-xs ${isSender ? 'text-blue-200' : 'text-gray-600'}`}>
+          {isLoading ? 'Downloading...' : !audioBlob ? 'Tap to download' : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+        </div>
+      </div>
+
+      <audio ref={audioRef} preload="metadata" />
+    </div>
+  );
+};
 export default function ChatMessages({ messages, chatId, selectedUser, messagesEndRef, isLoadingMore, onLoadMore, handleDeleteMessage }) {
   const scrollRef = useRef(null);
   const menuRef = useRef(null);
@@ -61,7 +183,7 @@ export default function ChatMessages({ messages, chatId, selectedUser, messagesE
   if (isLoadingMore && messages.length === 0) {
     return (
         <div className="flex-1 flex items-center justify-center h-full">
-            <Image src="/loader.gif" width={150} height={150} alt="Loading messages..." />
+            <Image src="/loader.gif" width={150} height={150} alt="Loading messages..." unoptimized />
         </div>
     );
   }
@@ -74,7 +196,7 @@ export default function ChatMessages({ messages, chatId, selectedUser, messagesE
         {/* This loader is for when you scroll up to load *more* messages. It's smaller and at the top. */}
         {isLoadingMore && messages.length > 0 && (
           <div className="flex justify-center my-4">
-            <Image src="/loader.gif" width={40} height={40} alt="Loading older messages..." />
+            <Image src="/loader.gif" width={40} height={40} alt="Loading older messages..." unoptimized />
           </div>
         )}
         {messages.length > 0 ? (
@@ -125,8 +247,20 @@ export default function ChatMessages({ messages, chatId, selectedUser, messagesE
                   
                   <div className="group relative">
                     <div className={bubbleClassNames}>
-                      <p className="whitespace-pre-wrap">{msg.message}</p>
-                      
+                      {(() => {
+                        const isAudioMessage = msg.messageType === 'audio' ||
+                          (msg.message && (
+                            msg.message.includes('firebasestorage.googleapis.com') &&
+                            msg.message.includes('chat-audio')
+                          ));
+
+                        return isAudioMessage ? (
+                          <AudioMessage audioData={msg.message} isSender={isSender} />
+                        ) : (
+                          <p className="whitespace-pre-wrap">{msg.message}</p>
+                        );
+                      })()}
+
                       <div className="flex justify-end items-center gap-1.5 mt-1">
                           <span className={`text-xs ${isSender ? 'text-blue-200' : 'text-gray-500'}`}>
                               {format(new Date(msg.timestamp), 'p')}

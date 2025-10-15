@@ -195,6 +195,7 @@ function UpgradePage({ user }) {
           alt="Loading..."
           width={350}
           height={350}
+          unoptimized
         />
       </div>
     );

@@ -49,7 +49,7 @@ function Fileview({ params }) {
     <div className="min-h-screen bg-gray-50">
       {loading ? (
         <div className="flex justify-center items-center min-h-screen">
-          <Image src="/loader.gif" alt="Loading..." width={350} height={350} className="w-100 h-100" />
+          <Image src="/loader.gif" alt="Loading..." width={350} height={350} className="w-100 h-100" unoptimized />
         </div>
       ) : error ? (
         <div className="flex justify-center items-center min-h-screen">

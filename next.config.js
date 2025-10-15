@@ -29,6 +29,33 @@ const nextConfig = {
         ],
       },
       {
+        // Return 204 No Content for missing react-toastify source maps to prevent 404 errors
+        source: '/_next/static/:path*/ReactToastify.css.map',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/json',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/_next/static/:path*/react-toastify.esm.mjs.map',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/json',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         // Apply permissions policy to all routes - allow camera and microphone for all
         source: '/:path*',
         headers: [

@@ -55,7 +55,7 @@ function FilePreview({ params }) {
   if (!file) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
-        <Image src="/loader.gif" alt="Loading..." width={200} height={200} />
+        <Image src="/loader.gif" alt="Loading..." width={200} height={200} unoptimized />
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-import 'react-toastify/dist/ReactToastify.css';
+// Import react-toastify CSS without source maps to prevent 404 errors
+import './toastify.css';
 import PageWrapper from "./PageWrapper"; // Import the new component
 import { SpeedInsights } from '@vercel/speed-insights/next';
 

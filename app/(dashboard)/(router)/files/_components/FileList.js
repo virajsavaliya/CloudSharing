@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { db, storage, moveToRecycleBin } from "../../../../../firebaseConfig";
 import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import Image from "next/image";
 import { getFileIcon } from "../../../../../_utils/fileIcons";
 

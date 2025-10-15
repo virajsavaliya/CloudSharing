@@ -15,7 +15,7 @@ export async function POST(req) {
         const decodedToken = await adminAuth.verifyIdToken(token);
         const authenticatedUserUid = decodedToken.uid;
 
-        const { senderId, receiverId, message } = await req.json();
+        const { senderId, receiverId, message, messageType } = await req.json();
 
         // **THE FIX IS HERE**: Changed userDoc.exists() to userDoc.exists
         const userDoc = await adminDb.collection('users').doc(authenticatedUserUid).get();
@@ -33,6 +33,7 @@ export async function POST(req) {
         await messagesCol.add({ 
             senderId, 
             message, 
+            messageType: messageType || 'text', // Store message type
             timestamp: FieldValue.serverTimestamp() 
         });
         
