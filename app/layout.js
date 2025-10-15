@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   title: "CloudSharing",
   description: "File Sharing Website",
+  other: {
+    'permissions-policy': 'camera=*, microphone=*, display-capture=*'
+  }
 };
 
 export default function RootLayout({ children }) {

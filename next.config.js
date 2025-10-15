@@ -1,11 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['your-domain.com', 'localhost'], // Added localhost for local development
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
       },
     ],
   },
@@ -22,6 +25,16 @@ const nextConfig = {
           {
             key: 'Content-Type',
             value: 'application/json',
+          },
+        ],
+      },
+      {
+        // Apply permissions policy to all routes - allow camera and microphone for all
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=*, microphone=*, display-capture=*, autoplay=*',
           },
         ],
       },

@@ -16,6 +16,13 @@ function MeetingPageContent() {
     const name = params.get("name") || "Guest";
     const isModerator = params.get("moderator") === "true";
 
+    // Check if we're in a secure context (required for WebRTC)
+    const isSecureContext = typeof window !== 'undefined' && (
+        window.location.protocol === 'https:' ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+    );
+
     // Refs for DOM elements and stable objects
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -33,32 +40,158 @@ function MeetingPageContent() {
     const [status, setStatus] = useState("Initializing...");
     const [participants, setParticipants] = useState([]);
     const [showParticipants, setShowParticipants] = useState(false);
+    const [permissionError, setPermissionError] = useState(null);
+    const [hasPermissions, setHasPermissions] = useState(false);
 
     useEffect(() => {
         const firestore = getFirestore(app);
         setDb(firestore);
     }, []);
 
+    // Function to check if media devices are available
+    const checkMediaDevices = async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            const audioDevices = devices.filter(device => device.kind === 'audioinput');
+
+            console.log("Available devices:");
+            console.log("Video devices:", videoDevices.length);
+            console.log("Audio devices:", audioDevices.length);
+
+            return { videoDevices: videoDevices.length, audioDevices: audioDevices.length };
+        } catch (error) {
+            console.error("Error enumerating devices:", error);
+            return { videoDevices: 0, audioDevices: 0 };
+        }
+    };
+
+    // Function to request media permissions
+    const requestMediaPermissions = async () => {
+        // If we already have permissions, don't request again
+        if (hasPermissions && localStreamRef.current) {
+            console.log("Already have permissions, skipping request");
+            return localStreamRef.current;
+        }
+
+        try {
+            setPermissionError(null);
+            setStatus("Checking available devices...");
+
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Your browser doesn't support camera/microphone access. Please use a modern browser like Chrome, Firefox, or Safari.");
+            }
+
+            // First check if devices are available
+            const { videoDevices, audioDevices } = await checkMediaDevices();
+
+            console.log("Devices found - Video:", videoDevices, "Audio:", audioDevices);
+
+            if (videoDevices === 0 && audioDevices === 0) {
+                throw new Error("No camera or microphone devices found. Please connect a camera/microphone.");
+            }
+
+            setStatus("Requesting camera & microphone permissions...");
+
+            console.log("Requesting user media with constraints:", {
+                video: videoDevices > 0 ? { width: 1280, height: 720 } : false,
+                audio: audioDevices > 0
+            });
+
+            // Request media access directly - let the browser handle permission prompts
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: videoDevices > 0 ? { width: 1280, height: 720 } : false,
+                audio: audioDevices > 0 ? true : false
+            });
+
+            console.log("Successfully got media stream:", stream);
+            console.log("Video tracks:", stream.getVideoTracks().length);
+            console.log("Audio tracks:", stream.getAudioTracks().length);
+
+            localStreamRef.current = stream;
+            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+            setHasPermissions(true);
+            setStatus("Permissions granted - setting up connection...");
+
+            return stream;
+        } catch (error) {
+            console.error("Permission error:", error);
+            console.error("Error name:", error.name);
+            console.error("Error message:", error.message);
+            let errorMessage = "Could not access camera/microphone.";
+
+            if (error.name === 'NotAllowedError') {
+                errorMessage = "Camera/microphone access denied. Please click 'Allow' when prompted, or check your browser settings to allow access for this website.";
+            } else if (error.name === 'NotFoundError') {
+                errorMessage = "No camera or microphone found. Please connect a camera/microphone and try again.";
+            } else if (error.name === 'NotReadableError') {
+                errorMessage = "Camera/microphone is already in use by another application.";
+            } else if (error.name === 'OverconstrainedError') {
+                errorMessage = "Camera/microphone doesn't support the requested settings. Trying with basic settings...";
+                // Try again with basic constraints
+                try {
+                    console.log("Trying fallback constraints...");
+                    const basicStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                    console.log("Fallback successful:", basicStream);
+                    localStreamRef.current = basicStream;
+                    if (localVideoRef.current) localVideoRef.current.srcObject = basicStream;
+                    setHasPermissions(true);
+                    setStatus("Permissions granted - setting up connection...");
+                    return basicStream;
+                } catch (fallbackError) {
+                    console.error("Fallback error:", fallbackError);
+                    errorMessage = "Camera/microphone access failed. Please check your device and browser settings.";
+                }
+            } else if (error.message.includes("devices found")) {
+                errorMessage = error.message;
+            } else {
+                errorMessage = `Access failed: ${error.message}`;
+            }
+
+            setPermissionError(errorMessage);
+            setStatus("Permission Error");
+            throw error;
+        }
+    };
+
     // This effect handles the entire WebRTC setup and signaling
     useEffect(() => {
         // Ensure this setup runs only once, even in Strict Mode
-        if (!db || !room || initialized.current) return;
+        if (!db || !room || initialized.current) {
+            console.log("Skipping initialization - db:", !!db, "room:", room, "initialized:", initialized.current);
+            return;
+        }
         initialized.current = true;
+        console.log("Starting WebRTC initialization for room:", room);
 
         const servers = {
             iceServers: [ { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] } ],
         };
 
         const startCall = async () => {
-            setStatus("Requesting camera & mic...");
             try {
-                // 1. Get local media
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                localStreamRef.current = stream;
-                if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-                
+                console.log("=== Starting Call ===");
+                console.log("Is Secure Context:", isSecureContext);
+                console.log("Protocol:", window.location.protocol);
+                console.log("Hostname:", window.location.hostname);
+
+                // Check if we're in a secure context
+                if (!isSecureContext) {
+                    setPermissionError("Video calls require a secure connection (HTTPS). Please access this page over HTTPS.");
+                    setStatus("Security Error");
+                    return;
+                }
+
+                // 1. Get local media with proper permission handling
+                const stream = await requestMediaPermissions();
+
+                console.log("Got stream, setting up connection...");
                 setStatus("Setting up connection...");
-                
+
                 // 2. Create Peer Connection
                 pc.current = new RTCPeerConnection(servers);
 
@@ -79,7 +212,7 @@ function MeetingPageContent() {
 
             } catch (error) {
                 console.error("Error starting call:", error);
-                setStatus("Error: Could not access camera/mic.");
+                // Error handling is now done in requestMediaPermissions
             }
         };
 
@@ -324,7 +457,11 @@ function MeetingPageContent() {
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <h1 className="text-white font-medium">Meeting: {room}</h1>
-                        <span className="text-sm px-2 py-1 bg-green-600/20 text-green-400 rounded">
+                        <span className={`text-sm px-2 py-1 rounded ${
+                            permissionError ? 'bg-red-600/20 text-red-400' :
+                            hasPermissions ? 'bg-green-600/20 text-green-400' :
+                            'bg-yellow-600/20 text-yellow-400'
+                        }`}>
                           {status}
                         </span>
                     </div>
@@ -340,6 +477,54 @@ function MeetingPageContent() {
                     </div>
                 </div>
             </div>
+
+            {/* Permission Error Overlay */}
+            {permissionError && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full text-center">
+                        <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-white text-lg font-semibold mb-2">Camera/Microphone Access Required</h3>
+                        <p className="text-gray-300 text-sm mb-6">{permissionError}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+                            >
+                                Refresh Page
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await requestMediaPermissions();
+                                        // If successful, restart the call
+                                        if (hasPermissions) {
+                                            window.location.reload();
+                                        }
+                                    } catch (error) {
+                                        // Error already handled in requestMediaPermissions
+                                    }
+                                }}
+                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                        <div className="mt-4 text-xs text-gray-400">
+                            <p>Make sure to:</p>
+                            <ul className="text-left mt-2 space-y-1">
+                                <li>• Click "Allow" when prompted by the browser</li>
+                                <li>• Check browser settings for camera/microphone permissions</li>
+                                <li>• Ensure no other app is using your camera/microphone</li>
+                                <li>• Reload the page if you previously denied access</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main content with Participants Panel */}
             <div className="max-w-7xl mx-auto p-4 flex flex-col lg:flex-row gap-4 h-[calc(100vh-64px)] relative">

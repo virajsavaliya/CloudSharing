@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     'X-Frame-Options': 'SAMEORIGIN',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+    'Permissions-Policy': 'camera=*, microphone=*, display-capture=*, geolocation=(), interest-cohort=()'
   })
 
   // Rate limiting for API routes
