@@ -27,7 +27,7 @@ function Files() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <FilesPage 
+      <FilesPage
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
       />
