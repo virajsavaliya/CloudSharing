@@ -189,11 +189,11 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
                 ) : <p className="text-center text-gray-500 py-4">No premium users found.</p>}
             </div>
 
-            {/* NEW SECTION: Free Users to Upgrade */}
+            {/* FREE USERS SECTION */}
             <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-200/80 shadow-sm">
                 {/* Visible indicator banner */}
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800"><strong>Free Users Section:</strong> Showing {freeUsers.length} free user(s)</p>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800"><strong>Free Users:</strong> {freeUsers.length} user(s) on lifetime free plan</p>
                 </div>
                 
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Free Users ({freeUsers.length})</h2>
@@ -202,10 +202,9 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Plan</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New Duration</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Email</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan Type</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -213,39 +212,21 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
                                     <tr key={user.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.email}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            {editingId === user.id ? (
-                                                <select value={editData.plan} onChange={e => setEditData(d => ({ ...d, plan: e.target.value }))} className="border-gray-300 rounded-md">
-                                                    {PLAN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                </select>
-                                            ) : (<span className="text-gray-500">Free</span>)}
+                                            <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                Free
+                                            </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            {editingId === user.id ? (
-                                                <select value={editData.duration} onChange={e => setEditData(d => ({ ...d, duration: e.target.value }))} className="border-gray-300 rounded-md">
-                                                    {DURATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                </select>
-                                            ) : '—'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                            {editingId === user.id ? (
-                                                <>
-                                                    <button onClick={() => handleSave(user)} disabled={saving} className="text-blue-600 hover:text-blue-800 mr-4">
-                                                        {saving ? 'Saving...' : 'Save Upgrade'}
-                                                    </button>
-                                                    <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-700">Cancel</button>
-                                                </>
-                                            ) : (
-                                                <button onClick={() => handleEdit(user, true)} className="text-green-600 hover:text-green-800 font-semibold">
-                                                    Upgrade
-                                                </button>
-                                            )}
+                                            <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                                Infinite
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                ) : <p className="text-center text-gray-500 py-4">No free users found to upgrade.</p>}
+                ) : <p className="text-center text-gray-500 py-4">No free users.</p>}
             </div>
         </div>
     );
