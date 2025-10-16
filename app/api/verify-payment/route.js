@@ -52,11 +52,33 @@ export async function POST(req) {
 
     // If payment is successful, update user subscription
     if (finalStatus === 'SUCCESS') {
+      // Calculate subscription start and end dates
+      const startDate = new Date();
+      let endDate = new Date(startDate);
+
+      // Set end date based on duration
+      switch (paymentData.duration) {
+        case 'monthly':
+          endDate.setMonth(endDate.getMonth() + 1);
+          break;
+        case '3months':
+          endDate.setMonth(endDate.getMonth() + 3);
+          break;
+        case 'annual':
+          endDate.setFullYear(endDate.getFullYear() + 1);
+          break;
+        default:
+          endDate.setMonth(endDate.getMonth() + 1); // Default to monthly
+      }
+
       await adminDb.collection('userSubscriptions').doc(paymentData.userId).set({
         plan: paymentData.plan,
         duration: paymentData.duration,
         userId: paymentData.userId,
         userEmail: paymentData.userEmail,
+        startDate: adminDb.FieldValue.serverTimestamp(),
+        endDate: adminDb.Timestamp.fromDate(endDate),
+        status: 'active',
         updatedAt: adminDb.FieldValue.serverTimestamp(),
         paymentId: order_id
       }, { merge: true });

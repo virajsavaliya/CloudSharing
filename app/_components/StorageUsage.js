@@ -4,8 +4,9 @@ import { STORAGE_PLANS, formatBytes } from '../_utils/StorageConfig';
 import { useStorageUsageSocket } from './StorageUsageWebSocket';
 
 const StorageUsage = ({ userId, userPlan = 'Free' }) => {
+    const [currentPlan, setCurrentPlan] = useState(userPlan);
     // Normalize plan name to handle case variations
-    const normalizedPlan = userPlan.charAt(0).toUpperCase() + userPlan.slice(1).toLowerCase();
+    const normalizedPlan = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1).toLowerCase();
     const [storageInfo, setStorageInfo] = useState({
         used: 0,
         total: 0,
@@ -21,18 +22,42 @@ const StorageUsage = ({ userId, userPlan = 'Free' }) => {
         });
     }, []);
 
+    // Fetch current active plan
+    useEffect(() => {
+        const fetchCurrentPlan = async () => {
+            if (!userId) return;
+
+            try {
+                const response = await fetch('/api/get-current-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    setCurrentPlan(data.planInfo.plan);
+                }
+            } catch (error) {
+                console.error('Error fetching current plan:', error);
+            }
+        };
+
+        fetchCurrentPlan();
+    }, [userId]);
+
     // Initial fetch and WebSocket subscription
     useEffect(() => {
         let isMounted = true;
 
         const fetchInitialStorageInfo = async () => {
-            if (!userId) return;
+            if (!userId || !currentPlan) return;
 
             try {
-                const usedStorage = await StorageManager.calculateUserStorage(userId, userPlan);
-                const planInfo = STORAGE_PLANS[normalizedPlan] || STORAGE_PLANS[userPlan] || STORAGE_PLANS.Free;
+                const usedStorage = await StorageManager.calculateUserStorage(userId, currentPlan);
+                const planInfo = STORAGE_PLANS[normalizedPlan] || STORAGE_PLANS[currentPlan] || STORAGE_PLANS.FREE;
                 const totalStorage = planInfo.maxStorage;
-                
+
                 if (isMounted) {
                     updateStorageInfo({ currentUsage: usedStorage, totalStorage });
                 }
@@ -47,7 +72,7 @@ const StorageUsage = ({ userId, userPlan = 'Free' }) => {
         return () => {
             isMounted = false;
         };
-    }, [userId, userPlan, updateStorageInfo]);
+    }, [userId, currentPlan, updateStorageInfo]);
 
     // WebSocket connection for real-time updates
     useStorageUsageSocket({ onStorageUpdate: updateStorageInfo });

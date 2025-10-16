@@ -2,7 +2,7 @@
 
 import { db } from '../../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { STORAGE_PLANS } from './StorageConfig';
+import { STORAGE_PLANS, formatBytes } from './StorageConfig';
 
 const updateStorageViaWebSocket = async (userId, currentUsage, totalStorage) => {
   try {

@@ -53,7 +53,7 @@ export async function POST(req) {
           customer_phone: customer.phone || "9898989898" 
         },
         order_meta: {
-          return_url: `${process.env.NEXT_PUBLIC_BASE_URL}/upgrade?order_id={order_id}`
+          return_url: `${process.env.NEXT_PUBLIC_BASE_URL_UPGRADE}upgrade?order_id={order_id}`
         },
         order_note: `Subscription for ${planName} - ${duration}`
       })
