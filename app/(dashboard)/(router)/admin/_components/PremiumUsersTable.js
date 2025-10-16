@@ -13,6 +13,13 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
     const [editData, setEditData] = useState({});
     const [saving, setSaving] = useState(false);
 
+    // Debug log to check if freeUsers is received
+    console.log('[PremiumUsersTable] Received props:', {
+        premiumUsersCount: premiumUsers?.length || 0,
+        freeUsersCount: freeUsers?.length || 0,
+        freeUsers: freeUsers
+    });
+
     // Memoized chart data calculation (no changes needed here)
     const chartData = useMemo(() => {
         const dayMap = premiumUsers.reduce((acc, user) => {
