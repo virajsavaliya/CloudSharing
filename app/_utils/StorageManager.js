@@ -19,12 +19,14 @@ const updateStorageViaWebSocket = async (userId, currentUsage, totalStorage) => 
 export const StorageManager = {
   calculateUserStorage: async (userEmail, userPlan = 'FREE') => {
     try {
-      const filesRef = collection(db, 'uploadedFile');
-      const q = query(filesRef, where('userEmail', '==', userEmail));
-      const snapshot = await getDocs(q);
       let totalSize = 0;
 
-      snapshot.docs.forEach((doc) => {
+      // Calculate size from individual files
+      const filesRef = collection(db, 'uploadedFile');
+      const filesQuery = query(filesRef, where('userEmail', '==', userEmail));
+      const filesSnapshot = await getDocs(filesQuery);
+
+      filesSnapshot.docs.forEach((doc) => {
         const data = doc.data();
         if (data.isDeleted === true) return;
         
@@ -46,6 +48,40 @@ export const StorageManager = {
               }
             }
           }
+        }
+      });
+
+      // Calculate size from folders
+      const foldersRef = collection(db, 'uploadedFolders');
+      const foldersQuery = query(foldersRef, where('userEmail', '==', userEmail));
+      const foldersSnapshot = await getDocs(foldersQuery);
+
+      foldersSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        // Check if folder is deleted (you might need to add this field to folders)
+        if (data.isDeleted === true) return;
+
+        // Sum up file sizes within the folder
+        if (data.files && Array.isArray(data.files)) {
+          data.files.forEach((file) => {
+            if (file.fileSize) {
+              let size = file.fileSize;
+              if (typeof size === 'number') {
+                totalSize += size;
+              } else if (typeof size === 'string') {
+                const numericValue = parseFloat(size.replace(/[^\d.]/g, ''));
+                if (!isNaN(numericValue)) {
+                  if (size.toLowerCase().includes('mb')) {
+                    totalSize += numericValue * 1024 * 1024;
+                  } else if (size.toLowerCase().includes('kb')) {
+                    totalSize += numericValue * 1024;
+                  } else {
+                    totalSize += numericValue;
+                  }
+                }
+              }
+            }
+          });
         }
       });
 
