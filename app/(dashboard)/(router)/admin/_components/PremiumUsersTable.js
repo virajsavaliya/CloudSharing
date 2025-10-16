@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { db } from "../../../../../firebaseConfig";
-import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { doc, updateDoc, setDoc, collection } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
 const PLAN_OPTIONS = ["Pro", "Premium"];
@@ -49,15 +49,18 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
             // Check if this is a free user being upgraded (no subId yet)
             if (!user.subId) {
                 // Create a new subscription for this free user
+                // Use user.id as document ID to match signup pattern
+                const userSubDocRef = doc(db, "userSubscriptions", user.id);
                 const newSubData = {
                     userId: user.id,
+                    userEmail: user.email,
                     plan: editData.plan,
                     duration: editData.duration,
                     status: 'active',
                     createdAt: new Date(),
                 };
                 
-                await addDoc(collection(db, "userSubscriptions"), newSubData);
+                await setDoc(userSubDocRef, newSubData);
                 console.log('[PremiumUsersTable] Created new subscription for free user:', user.id);
             } else {
                 // Update existing subscription

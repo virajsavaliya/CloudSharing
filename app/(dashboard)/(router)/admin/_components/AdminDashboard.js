@@ -74,17 +74,35 @@ export default function AdminDashboard() {
             const premiumUsersData = [];
             const freeUsersData = [];
 
+            console.log('[AdminDashboard] Total users:', usersList.length);
+            console.log('[AdminDashboard] Total subscriptions:', subsList.length);
+            console.log('[AdminDashboard] Subscriptions:', subsList);
+
             usersList.forEach(u => {
-                const sub = subsList.find(s => s.userId === u.id);
+                // Match by document ID (more reliable than userId field)
+                const sub = subsList.find(s => s.id === u.id || s.userId === u.id);
+                
+                console.log(`[AdminDashboard] User ${u.id} (${u.email}):`, {
+                    hasSubscription: !!sub,
+                    plan: sub?.plan,
+                    isPremium: sub && sub.plan && sub.plan !== "Free"
+                });
                 
                 if (sub && sub.plan && sub.plan !== "Free") {
                     // Premium user
                     premiumUsersData.push({ ...u, ...sub, subId: sub.id });
                 } else {
-                    // Free user
-                    freeUsersData.push({ ...u, plan: "Free" });
+                    // Free user - include subscription data if it exists
+                    const userData = { ...u, plan: "Free" };
+                    if (sub) {
+                        userData.subId = sub.id;
+                    }
+                    freeUsersData.push(userData);
                 }
             });
+
+            console.log('[AdminDashboard] Premium users:', premiumUsersData.length);
+            console.log('[AdminDashboard] Free users:', freeUsersData.length);
 
             setPremiumUsers(premiumUsersData);
             setFreeUsers(freeUsersData);
