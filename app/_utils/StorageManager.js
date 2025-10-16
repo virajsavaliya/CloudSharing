@@ -17,7 +17,7 @@ const updateStorageViaWebSocket = async (userId, currentUsage, totalStorage) => 
 };
 
 export const StorageManager = {
-  calculateUserStorage: async (userEmail) => {
+  calculateUserStorage: async (userEmail, userPlan = 'FREE') => {
     try {
       const filesRef = collection(db, 'uploadedFile');
       const q = query(filesRef, where('userEmail', '==', userEmail));
@@ -67,7 +67,7 @@ export const StorageManager = {
 
   canUploadFile: async (userEmail, fileSize, userPlan = 'FREE') => {
     try {
-      const currentUsage = await StorageManager.calculateUserStorage(userEmail);
+      const currentUsage = await StorageManager.calculateUserStorage(userEmail, userPlan);
       const plan = STORAGE_PLANS[userPlan] || STORAGE_PLANS.FREE;
       const newFileSize = typeof fileSize === 'string' 
         ? parseInt(fileSize.replace(/[^\d]/g, '')) * 1024 * 1024 

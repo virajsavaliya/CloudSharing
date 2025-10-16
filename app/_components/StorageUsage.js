@@ -29,7 +29,7 @@ const StorageUsage = ({ userId, userPlan = 'Free' }) => {
             if (!userId) return;
 
             try {
-                const usedStorage = await StorageManager.calculateUserStorage(userId);
+                const usedStorage = await StorageManager.calculateUserStorage(userId, userPlan);
                 const planInfo = STORAGE_PLANS[normalizedPlan] || STORAGE_PLANS[userPlan] || STORAGE_PLANS.Free;
                 const totalStorage = planInfo.maxStorage;
                 
