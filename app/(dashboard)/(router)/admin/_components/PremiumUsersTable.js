@@ -16,8 +16,9 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
     // Debug log to check if freeUsers is received
     console.log('[PremiumUsersTable] Received props:', {
         premiumUsersCount: premiumUsers?.length || 0,
-        freeUsersCount: freeUsers?.length || 0,
-        freeUsers: freeUsers
+        freeUsersCount: Array.isArray(freeUsers) ? freeUsers.length : 0,
+        freeUsersArray: freeUsers,
+        isFreeUsersArray: Array.isArray(freeUsers)
     });
 
     // Memoized chart data calculation (no changes needed here)

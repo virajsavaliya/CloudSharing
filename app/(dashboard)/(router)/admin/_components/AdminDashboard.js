@@ -145,10 +145,10 @@ export default function AdminDashboard() {
     };
 
     const renderContent = () => {
-        const freeUsers = stats.totalUsers - stats.premiumUsers;
+        const freeUsersCount = stats.totalUsers - stats.premiumUsers;
         const pieData = [
             { name: 'Premium', value: stats.premiumUsers, fill: '#3b82f6' },
-            { name: 'Free', value: freeUsers, fill: '#a5b4fc' },
+            { name: 'Free', value: freeUsersCount, fill: '#a5b4fc' },
         ];
         const userGrowthData = users.reduce((acc, user) => {
             const date = user.createdAt?.toDate().toLocaleDateString() || 'N/A';
