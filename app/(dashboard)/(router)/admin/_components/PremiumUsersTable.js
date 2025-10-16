@@ -190,6 +190,11 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
 
             {/* NEW SECTION: Free Users to Upgrade */}
             <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-200/80 shadow-sm">
+                {/* Visible indicator banner */}
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800"><strong>Free Users Section:</strong> Showing {freeUsers.length} free user(s)</p>
+                </div>
+                
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Free Users ({freeUsers.length})</h2>
                 {freeUsers.length > 0 ? (
                      <div className="overflow-x-auto">
