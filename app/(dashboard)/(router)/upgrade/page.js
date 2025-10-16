@@ -78,8 +78,17 @@ function UpgradePage({ user }) {
 
   // ✅ Update Firestore after payment
   const handleFirebaseUpdate = async (plan, dur) => {
-    if (!plan || !dur || !user) return;
+    if (!plan || !dur || !user) {
+      console.error("[UpgradePage] Missing required data for Firebase update:", {
+        plan, dur, userId: user?.uid
+      });
+      return;
+    }
     try {
+      console.log("[UpgradePage] Updating Firestore subscription:", {
+        plan, duration: dur, userId: user.uid
+      });
+      
       await setDoc(
         doc(db, "userSubscriptions", user.uid),
         {
@@ -91,10 +100,12 @@ function UpgradePage({ user }) {
         },
         { merge: true }
       );
+      
+      console.log("[UpgradePage] Successfully updated subscription in Firestore");
       setCurrentPlan(plan);
       setCurrentDuration(dur);
     } catch (error) {
-      console.error("Error upgrading plan:", error);
+      console.error("[UpgradePage] Error upgrading plan:", error);
       setUpgradeError("Failed to update your plan. Please contact support.");
     }
   };
@@ -102,29 +113,52 @@ function UpgradePage({ user }) {
   // ✅ Verify payment after redirect
   useEffect(() => {
     const orderId = searchParams.get("order_id");
+    console.log("[UpgradePage] Checking for order_id in URL params:", orderId);
+    
     if (orderId) {
       setVerifying(true);
       const verifyPayment = async () => {
         try {
+          console.log("[UpgradePage] Starting payment verification for order:", orderId);
+          
           const res = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ order_id: orderId }),
           });
+          
+          console.log("[UpgradePage] Verify payment response status:", res.status);
+          
           const result = await res.json();
+          console.log("[UpgradePage] Verify payment result:", {
+            success: result.success,
+            status: result.paymentData?.status,
+            plan: result.paymentData?.plan,
+            error: result.error
+          });
+          
           if (result.success) {
             setPaymentResult(result.paymentData);
             if (result.paymentData.status === "SUCCESS") {
+              console.log("[UpgradePage] Payment successful! Updating subscription...");
               handleFirebaseUpdate(
                 result.paymentData.plan,
                 result.paymentData.duration
               );
+              // Refetch user plan after successful payment
+              setTimeout(() => {
+                console.log("[UpgradePage] Refetching user plan after payment...");
+                fetchUserPlan();
+              }, 1000);
+            } else {
+              console.log("[UpgradePage] Payment status is not SUCCESS:", result.paymentData.status);
             }
           } else {
+            console.error("[UpgradePage] Payment verification failed:", result.error);
             setUpgradeError(result.error || "Payment verification failed.");
           }
         } catch (error) {
-          console.error("Error verifying payment:", error);
+          console.error("[UpgradePage] Error verifying payment:", error);
           setUpgradeError("An error occurred while verifying your payment.");
         } finally {
           setVerifying(false);
@@ -135,33 +169,35 @@ function UpgradePage({ user }) {
     }
   }, [searchParams, router, pathname]);
 
-  // ✅ Fetch user’s current plan
-  useEffect(() => {
-    const fetchUserPlan = async () => {
-      if (!user) return;
-      setLoading(true);
-      try {
-        const userSubDoc = await getDoc(doc(db, "userSubscriptions", user.uid));
-        if (userSubDoc.exists()) {
-          const data = userSubDoc.data();
-          setCurrentPlan(data.plan);
-          setCurrentDuration(data.duration || "monthly");
-        } else {
-          await setDoc(doc(db, "userSubscriptions", user.uid), {
-            plan: "Free",
-            userId: user.uid,
-            userEmail: user.email,
-            duration: "monthly",
-            updatedAt: new Date(),
-          });
-          setCurrentPlan("Free");
-        }
-      } catch (error) {
-        console.error("Error fetching user plan:", error);
-      } finally {
-        setLoading(false);
+    // ✅ Fetch user's current plan
+  const fetchUserPlan = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const userSubDoc = await getDoc(doc(db, "userSubscriptions", user.uid));
+      if (userSubDoc.exists()) {
+        const data = userSubDoc.data();
+        console.log("[UpgradePage] Fetched user subscription:", data);
+        setCurrentPlan(data.plan);
+        setCurrentDuration(data.duration || "monthly");
+      } else {
+        await setDoc(doc(db, "userSubscriptions", user.uid), {
+          plan: "Free",
+          userId: user.uid,
+          userEmail: user.email,
+          duration: "monthly",
+          updatedAt: new Date(),
+        });
+        setCurrentPlan("Free");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching user plan:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUserPlan();
   }, [user, db]);
 
@@ -350,6 +386,7 @@ function UpgradePage({ user }) {
                 finalAmount={paymentResult.amount}
                 user={user}
                 orderId={paymentResult.orderId}
+                paymentMethod={paymentResult.paymentMethod}
                 onClose={() => setPaymentResult(null)}
               />
             )

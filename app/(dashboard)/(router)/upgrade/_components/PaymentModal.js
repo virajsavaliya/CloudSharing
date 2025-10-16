@@ -32,12 +32,17 @@ export default function PaymentModal({
 
   const getSessionId = async () => {
     try {
+      console.log("[PaymentModal] Creating payment session for:", {
+        amount,
+        planName,
+        duration
+      });
+
       const res = await fetch("/api/create-payment-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        // ✅ ADD basePrice to the body
         body: JSON.stringify({
           amount,
           user,
@@ -47,14 +52,19 @@ export default function PaymentModal({
         }),
       });
 
+      console.log("[PaymentModal] Session creation response status:", res.status);
+
       if (!res.ok) {
         const errorData = await res.json();
+        console.error("[PaymentModal] Session creation failed:", errorData);
         throw new Error(errorData.error || "Failed to create payment session");
       }
 
       const data = await res.json();
-      return data.payment_session_id; // Adjusted based on your new API response
+      console.log("[PaymentModal] Got session ID:", data.payment_session_id);
+      return data.payment_session_id;
     } catch (err) {
+      console.error("[PaymentModal] Error in getSessionId:", err.message);
       setError(err.message);
       return null;
     }
@@ -62,24 +72,35 @@ export default function PaymentModal({
 
   const initiatePayment = async () => {
     if (!cashfree) {
+      console.error("[PaymentModal] Cashfree SDK not loaded");
       setError("Payment gateway is not ready.");
       return;
     }
     setLoading(true);
     setError("");
 
+    console.log("[PaymentModal] Initiating payment...");
     const sessionId = await getSessionId();
 
     if (sessionId) {
+      const returnUrl = `${process.env.NEXT_PUBLIC_BASE_URL_UPGRADE}${process.env.NEXT_PUBLIC_BASE_URL_UPGRADE?.endsWith('/') ? '' : '/'}upgrade?order_id={order_id}`;
+      console.log("[PaymentModal] Opening Cashfree checkout with return URL:", returnUrl);
+
       const checkoutOptions = {
         paymentSessionId: sessionId,
-        returnUrl: `${process.env.NEXT_PUBLIC_BASE_URL_UPGRADE}upgrade?order_id={order_id}`,
+        returnUrl: returnUrl,
       };
+      
       cashfree.checkout(checkoutOptions).then((result) => {
         if (result.error) {
+          console.error("[PaymentModal] Checkout error:", result.error);
           setError(result.error.message);
+        } else {
+          console.log("[PaymentModal] Checkout completed successfully");
         }
       });
+    } else {
+      console.error("[PaymentModal] No session ID obtained");
     }
     setLoading(false);
   };

@@ -1,8 +1,8 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, deleteDoc, getDocs, collection, query, where, serverTimestamp } from "firebase/firestore";
+import { getStorage, ref, deleteObject } from "firebase/storage";
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
