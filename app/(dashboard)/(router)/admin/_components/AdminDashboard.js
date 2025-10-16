@@ -43,6 +43,7 @@ export default function AdminDashboard() {
     const [users, setUsers] = useState([]);
     const [files, setFiles] = useState([]);
     const [premiumUsers, setPremiumUsers] = useState([]);
+    const [freeUsers, setFreeUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const navOptions = [
@@ -55,33 +56,56 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
         setIsLoading(true);
-        const usersSnap = await getDocs(collection(db, "users"));
-        const usersList = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setUsers(usersList);
+        try {
+            const usersSnap = await getDocs(collection(db, "users"));
+            const usersList = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setUsers(usersList);
 
-        const filesSnap = await getDocs(collection(db, "uploadedFile"));
-        const foldersSnap = await getDocs(collection(db, "uploadedFolders"));
-        const filesList = filesSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'file' }));
-        const foldersList = foldersSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'folder' }));
-        setFiles([...filesList, ...foldersList]);
+            const filesSnap = await getDocs(collection(db, "uploadedFile"));
+            const foldersSnap = await getDocs(collection(db, "uploadedFolders"));
+            const filesList = filesSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'file' }));
+            const foldersList = foldersSnap.docs.map(d => ({ id: d.id, ...d.data(), type: 'folder' }));
+            setFiles([...filesList, ...foldersList]);
 
-        const subsSnap = await getDocs(collection(db, "userSubscriptions"));
-        const subsList = subsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const subsSnap = await getDocs(collection(db, "userSubscriptions"));
+            const subsList = subsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const premiumUsersData = usersList.map(u => {
-            const sub = subsList.find(s => s.userId === u.id && s.plan && s.plan !== "Free");
-            if (sub) return { ...u, ...sub, subId: sub.id };
-            return null;
-        }).filter(Boolean);
-        setPremiumUsers(premiumUsersData);
+            // Separate premium and free users
+            const premiumUsersData = [];
+            const freeUsersData = [];
 
-        const totalStorage = [...filesList, ...foldersList].reduce((acc, file) => acc + (file.fileSize || 0), 0) / (1024 * 1024);
-        const planPrices = { Pro: { monthly: 830, '3months': 2115, annual: 6972 }, Premium: { monthly: 1660, '3months': 4233, annual: 13944 } };
-        const totalSales = subsList.reduce((acc, sub) => acc + (planPrices[sub.plan]?.[sub.duration] || 0), 0);
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const activeUsers = usersList.filter(u => u.lastLogin?.toDate() > sevenDaysAgo).length;
+            usersList.forEach(u => {
+                const sub = subsList.find(s => s.userId === u.id);
+                
+                if (sub && sub.plan && sub.plan !== "Free") {
+                    // Premium user
+                    premiumUsersData.push({ ...u, ...sub, subId: sub.id });
+                } else {
+                    // Free user
+                    freeUsersData.push({ ...u, plan: "Free" });
+                }
+            });
 
-        setStats({ totalUsers: usersList.length, totalFiles: filesList.length + foldersList.length, totalStorage, premiumUsers: premiumUsersData.length, sales: totalSales, activeUsers });
+            setPremiumUsers(premiumUsersData);
+            setFreeUsers(freeUsersData);
+
+            const totalStorage = [...filesList, ...foldersList].reduce((acc, file) => acc + (file.fileSize || 0), 0) / (1024 * 1024);
+            const planPrices = { Pro: { monthly: 830, '3months': 2115, annual: 6972 }, Premium: { monthly: 1660, '3months': 4233, annual: 13944 } };
+            const totalSales = subsList.reduce((acc, sub) => acc + (planPrices[sub.plan]?.[sub.duration] || 0), 0);
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const activeUsers = usersList.filter(u => u.lastLogin?.toDate() > sevenDaysAgo).length;
+
+            setStats({ 
+                totalUsers: usersList.length, 
+                totalFiles: filesList.length + foldersList.length, 
+                totalStorage, 
+                premiumUsers: premiumUsersData.length, 
+                sales: totalSales, 
+                activeUsers 
+            });
+        } catch (error) {
+            console.error('[AdminDashboard] Error fetching data:', error);
+        }
         setIsLoading(false);
     };
 
@@ -142,7 +166,7 @@ export default function AdminDashboard() {
                     </>
                 );
             case "users": return <UsersTableView users={users} onUpdate={(id, data, coll) => handleUpdate(id, data, coll)} onDelete={(id, type) => handleDelete(id, type)} />;
-            case "premium": return <PremiumUsersTableView premiumUsers={premiumUsers} onUpdate={(id, data, coll) => handleUpdate(id, data, coll)} />;
+            case "premium": return <PremiumUsersTableView premiumUsers={premiumUsers} freeUsers={freeUsers} onUpdate={(id, data, coll) => handleUpdate(id, data, coll)} />;
             case "files": return <FilesTableView files={files} onDelete={(id, type) => handleDelete(id, type)} />;
             case "storage": return <StorageUsageView />;
             default: return <div>Select a tab</div>;

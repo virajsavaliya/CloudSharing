@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { db } from "../../../../../firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
 const PLAN_OPTIONS = ["Pro", "Premium"];
@@ -46,8 +46,27 @@ export default function PremiumUsersTable({ premiumUsers, freeUsers = [], onUpda
     const handleSave = async (user) => {
         setSaving(true);
         try {
-            // The onUpdate prop is used to handle the actual database write
-            await onUpdate(user.subId, { plan: editData.plan, duration: editData.duration }, "userSubscriptions");
+            // Check if this is a free user being upgraded (no subId yet)
+            if (!user.subId) {
+                // Create a new subscription for this free user
+                const newSubData = {
+                    userId: user.id,
+                    plan: editData.plan,
+                    duration: editData.duration,
+                    status: 'active',
+                    createdAt: new Date(),
+                };
+                
+                await addDoc(collection(db, "userSubscriptions"), newSubData);
+                console.log('[PremiumUsersTable] Created new subscription for free user:', user.id);
+            } else {
+                // Update existing subscription
+                await onUpdate(user.subId, { plan: editData.plan, duration: editData.duration }, "userSubscriptions");
+                console.log('[PremiumUsersTable] Updated subscription for user:', user.id);
+            }
+        } catch (error) {
+            console.error('[PremiumUsersTable] Error saving subscription:', error);
+            alert('Failed to save subscription. Please try again.');
         } finally {
             setEditingId(null);
             setSaving(false);
