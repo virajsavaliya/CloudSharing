@@ -47,6 +47,19 @@ export default function SignUpPage() {
         createdAt: new Date(),
         role: "user"
       });
+
+      // ✅ Create Free plan subscription for new user
+      const userSubDocRef = doc(db, "userSubscriptions", user.uid);
+      await setDoc(userSubDocRef, {
+        userId: user.uid,
+        userEmail: user.email,
+        plan: "Free",
+        duration: "monthly",
+        status: "active",
+        createdAt: new Date(),
+      });
+      console.log("[SignUp] Created Free plan subscription for user:", user.uid);
+
       // Log register activity
       await addDoc(collection(db, "activityLogs"), {
         type: "register",
@@ -112,6 +125,18 @@ export default function SignUpPage() {
           createdAt: new Date(),
           role: "user"
         });
+
+        // ✅ Create Free plan subscription for new user
+        const userSubDocRef = doc(db, "userSubscriptions", user.uid);
+        await setDoc(userSubDocRef, {
+          userId: user.uid,
+          userEmail: user.email,
+          plan: "Free",
+          duration: "monthly",
+          status: "active",
+          createdAt: new Date(),
+        });
+        console.log("[GoogleSignUp] Created Free plan subscription for user:", user.uid);
       }
       router.push("/upload");
     } catch (err) {
