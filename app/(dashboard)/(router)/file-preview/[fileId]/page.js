@@ -90,13 +90,31 @@ function FilePreview({ params }) {
         <div className="col-span-2 flex flex-col gap-6">
           <FileShareForm file={file} onPasswordSave={onPasswordSave} onReceiversAdd={onReceiversAdd} />
 
+          {/* Active Users Section with Modern Design */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="rounded-2xl bg-white/40 backdrop-blur-xl p-6 shadow-lg border border-white/20"
+            className="rounded-3xl bg-gradient-to-br from-white via-blue-50/30 to-white backdrop-blur-xl p-8 shadow-2xl border-2 border-blue-100/50 hover:border-blue-200/80 transition-all"
           >
-            <h2 className="text-lg font-semibold text-gray-700 mb-3">Active Users</h2>
+            {/* Header with Icon */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#007dfc] to-blue-500 rounded-2xl blur-lg opacity-50"></div>
+                  <div className="relative p-3 bg-gradient-to-br from-[#007dfc] to-blue-500 rounded-2xl shadow-lg">
+                    <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Active Users</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">Share files instantly with nearby users</p>
+                </div>
+              </div>
+            </div>
+            
             <OnlineUserList file={file} />
           </motion.div>
         </div>

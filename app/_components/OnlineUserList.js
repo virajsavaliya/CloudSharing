@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePresence } from './PresenceProvider';
 import { useAuth } from '../_utils/FirebaseAuthContext';
-import { Share2, UserCircle, Wifi, WifiOff } from 'lucide-react';
+import { Share2, UserCircle, Wifi, WifiOff, Network } from 'lucide-react';
+import { motion } from 'framer-motion';
 import JSZip from 'jszip';
 import toast from 'react-hot-toast';
 
@@ -11,9 +12,81 @@ function OnlineUserList({ file }) {
     const { peers, initiateFileTransfer, isConnected } = usePresence();
     const { user } = useAuth();
     const [isZipping, setIsZipping] = useState(false);
+    const [localNetworkUsers, setLocalNetworkUsers] = useState([]);
+    const [isCheckingNetwork, setIsCheckingNetwork] = useState(true);
 
-    // ✅ ADD THIS LINE BACK
+    // Filter users who are NOT the current user
     const otherUsers = user ? Object.entries(peers || {}).filter(([uid, peerUser]) => uid !== user.uid) : [];
+
+    // Detect if users are on the same local network
+    useEffect(() => {
+        const checkLocalNetwork = async () => {
+            if (!otherUsers.length) {
+                setIsCheckingNetwork(false);
+                setLocalNetworkUsers([]);
+                return;
+            }
+
+            try {
+                setIsCheckingNetwork(true);
+                
+                // Get current user's local IP
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                // Wait for ICE candidate with local IP
+                const localIP = await new Promise((resolve) => {
+                    const timeout = setTimeout(() => resolve(null), 2000);
+                    pc.onicecandidate = (e) => {
+                        if (e.candidate && e.candidate.candidate) {
+                            const ipMatch = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+                            if (ipMatch && ipMatch[1]) {
+                                clearTimeout(timeout);
+                                pc.close();
+                                resolve(ipMatch[1]);
+                            }
+                        }
+                    };
+                });
+
+                if (!localIP) {
+                    // If we can't detect local IP, assume same network for now
+                    setLocalNetworkUsers(otherUsers);
+                    setIsCheckingNetwork(false);
+                    return;
+                }
+
+                // Check if IP is private (local network)
+                const ipParts = localIP.split('.');
+                const firstOctet = parseInt(ipParts[0]);
+                const secondOctet = parseInt(ipParts[1]);
+                
+                const isPrivateIP = 
+                    firstOctet === 10 || 
+                    (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) ||
+                    (firstOctet === 192 && secondOctet === 168);
+
+                // If user is on private network, show other users (they should be on same network via WebRTC)
+                if (isPrivateIP) {
+                    setLocalNetworkUsers(otherUsers);
+                } else {
+                    // Public IP - users might not be on same network
+                    setLocalNetworkUsers([]);
+                }
+
+            } catch (error) {
+                console.error("Error checking network:", error);
+                // On error, don't show users to be safe
+                setLocalNetworkUsers([]);
+            } finally {
+                setIsCheckingNetwork(false);
+            }
+        };
+
+        checkLocalNetwork();
+    }, [otherUsers.length, user]);
 
     const handleShareClick = async (peerId, peerUser) => {
         if (file && file.files && Array.isArray(file.files)) {
@@ -42,10 +115,9 @@ function OnlineUserList({ file }) {
             }
         } else {
             const fileToSend = {
-                // ✅ Use the correct property names you found in the console
-                fileName: file.fileName || file.folderName, // Use fileName OR folderName
+                fileName: file.fileName || file.folderName,
                 fileSize: file.fileSize || file.size,
-                fileUrl: file.fileUrl || file.zipUrl,   // Use fileUrl OR zipUrl
+                fileUrl: file.fileUrl || file.zipUrl,
             };
             if (!fileToSend.fileName || !fileToSend.fileSize || !fileToSend.fileUrl) {
                 toast.error("File data is incomplete and cannot be sent.");
@@ -58,38 +130,175 @@ function OnlineUserList({ file }) {
 
     if (!user) return null;
 
-    return (
-        <div className="border p-5 rounded-md mt-5">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Share2 size={20} />
-                Share with Online Users
-            </h3>
-            <div className={`flex items-center gap-2 text-sm mt-2 ${isConnected ? 'text-green-600' : 'text-red-500'}`}>
-                {isConnected ? <Wifi size={16} /> : <WifiOff size={16} />}
-                <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+    // Don't show the section if no local network users
+    if (!isCheckingNetwork && localNetworkUsers.length === 0 && otherUsers.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", duration: 0.6 }}
+                    className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl mb-4 shadow-inner"
+                >
+                    <UserCircle size={48} className="text-gray-400" />
+                </motion.div>
+                <p className="text-gray-600 font-semibold text-lg mb-2">No Active Users</p>
+                <p className="text-sm text-gray-500 max-w-md mx-auto">
+                    When other users join your network, they'll appear here for instant file sharing
+                </p>
             </div>
-            <hr className="my-4" />
+        );
+    }
+
+    return (
+        <div className="space-y-5">
+            {/* Connection Status Badge */}
+            <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4 }}
+                className={`inline-flex items-center gap-3 px-5 py-3 rounded-2xl font-medium text-sm shadow-lg ${
+                    isConnected 
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' 
+                        : 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
+                }`}
+            >
+                <div className="relative">
+                    {isConnected ? <Wifi size={20} /> : <WifiOff size={20} />}
+                    {isConnected && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping"></span>
+                    )}
+                </div>
+                <span>{isConnected ? 'Connected to Network' : 'Network Disconnected'}</span>
+            </motion.div>
+            
+            {/* Divider */}
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                    <span className="px-4 bg-gradient-to-br from-white via-blue-50/30 to-white text-gray-500 font-medium">
+                        {localNetworkUsers.length} {localNetworkUsers.length === 1 ? 'User' : 'Users'} Available
+                    </span>
+                </div>
+            </div>
+            
+            {/* Users List */}
             <div className="space-y-3">
-                {otherUsers.length > 0 ? (
-                    otherUsers.map(([id, peerUser]) => (
-                        <div key={id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                            <div className="flex items-center gap-3">
-                                <UserCircle className="text-gray-500" />
-                                <span className="text-gray-800 font-medium">{peerUser.displayName}</span>
+                {isCheckingNetwork ? (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center py-12"
+                    >
+                        <div className="inline-flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <Network size={40} className="text-[#007dfc] animate-spin" />
+                                <div className="absolute inset-0 bg-[#007dfc] blur-xl opacity-30 animate-pulse"></div>
                             </div>
-                            <div className="w-36 text-right">
-                                <button
-                                    className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400"
-                                    onClick={() => handleShareClick(id, peerUser)}
-                                    disabled={isZipping}
-                                >
-                                    {isZipping ? 'Zipping...' : 'Send'}
-                                </button>
+                            <div>
+                                <p className="text-gray-700 font-semibold">Scanning Network...</p>
+                                <p className="text-sm text-gray-500 mt-1">Looking for nearby users</p>
                             </div>
                         </div>
+                    </motion.div>
+                ) : localNetworkUsers.length > 0 ? (
+                    localNetworkUsers.map(([id, peerUser], index) => (
+                        <motion.div
+                            key={id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1, duration: 0.4 }}
+                            className="group relative"
+                        >
+                            {/* Hover Glow Effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-[#007dfc]/0 via-[#007dfc]/5 to-[#007dfc]/0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            
+                            <div className="relative flex items-center justify-between p-5 bg-white border-2 border-gray-200 rounded-2xl hover:border-[#007dfc]/50 hover:shadow-xl transition-all duration-300">
+                                <div className="flex items-center gap-4">
+                                    {/* Avatar with Status */}
+                                    <div className="relative">
+                                        <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl shadow-md group-hover:shadow-lg transition-shadow">
+                                            <UserCircle className="text-[#007dfc]" size={32} />
+                                        </div>
+                                        {/* Online Status Indicator */}
+                                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full shadow-lg">
+                                            <span className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* User Info */}
+                                    <div>
+                                        <p className="text-gray-900 font-bold text-lg">{peerUser.displayName}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded-full">
+                                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                                Online Now
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Send Button */}
+                                <button
+                                    onClick={() => handleShareClick(id, peerUser)}
+                                    disabled={isZipping}
+                                    className="relative group/btn px-6 py-3 bg-gradient-to-r from-[#007dfc] to-blue-500 text-white font-bold rounded-xl hover:shadow-2xl hover:shadow-blue-500/50 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 overflow-hidden"
+                                >
+                                    {/* Button Glow Effect */}
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700"></div>
+                                    
+                                    <span className="relative flex items-center gap-2">
+                                        {isZipping ? (
+                                            <>
+                                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Preparing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                                </svg>
+                                                Send File
+                                            </>
+                                        )}
+                                    </span>
+                                </button>
+                            </div>
+                        </motion.div>
                     ))
+                ) : otherUsers.length > 0 ? (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center py-12 px-6 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl border-2 border-orange-200"
+                    >
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-orange-100 to-yellow-100 rounded-3xl mb-4 shadow-lg">
+                            <Network size={40} className="text-orange-500" />
+                        </div>
+                        <p className="text-gray-800 font-bold text-lg mb-2">Different Network Detected</p>
+                        <p className="text-sm text-gray-600 max-w-md mx-auto">
+                            Users detected but not on your local network. Direct file sharing requires same WiFi/network connection.
+                        </p>
+                    </motion.div>
                 ) : (
-                    <p className="text-gray-500 text-sm text-center py-4">No other users are currently online on your network.</p>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center py-12"
+                    >
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl mb-4 shadow-inner">
+                            <UserCircle size={40} className="text-gray-400" />
+                        </div>
+                        <p className="text-gray-600 font-semibold text-lg mb-2">No Users Online</p>
+                        <p className="text-sm text-gray-500 max-w-md mx-auto">
+                            Waiting for users to join your local network
+                        </p>
+                    </motion.div>
                 )}
             </div>
         </div>
