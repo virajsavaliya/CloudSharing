@@ -18,7 +18,7 @@ function OnlineUserList({ file }) {
     // Filter users who are NOT the current user
     const otherUsers = user ? Object.entries(peers || {}).filter(([uid, peerUser]) => uid !== user.uid) : [];
 
-    // Detect if users are on the same local network
+    // Detect if users are on the same local network by checking subnet
     useEffect(() => {
         const checkLocalNetwork = async () => {
             if (!otherUsers.length) {
@@ -37,7 +37,7 @@ function OnlineUserList({ file }) {
                 await pc.setLocalDescription(offer);
 
                 // Wait for ICE candidate with local IP
-                const localIP = await new Promise((resolve) => {
+                const myLocalIP = await new Promise((resolve) => {
                     const timeout = setTimeout(() => resolve(null), 2000);
                     pc.onicecandidate = (e) => {
                         if (e.candidate && e.candidate.candidate) {
@@ -51,34 +51,58 @@ function OnlineUserList({ file }) {
                     };
                 });
 
-                if (!localIP) {
-                    // If we can't detect local IP, assume same network for now
-                    setLocalNetworkUsers(otherUsers);
+                if (!myLocalIP) {
+                    // If we can't detect local IP, hide users for security
+                    console.warn('[Network Detection] Could not detect local IP');
+                    setLocalNetworkUsers([]);
                     setIsCheckingNetwork(false);
                     return;
                 }
 
-                // Check if IP is private (local network)
-                const ipParts = localIP.split('.');
-                const firstOctet = parseInt(ipParts[0]);
-                const secondOctet = parseInt(ipParts[1]);
+                console.log('[Network Detection] My IP:', myLocalIP);
+
+                // Check if my IP is private (local network)
+                const myIPParts = myLocalIP.split('.');
+                const firstOctet = parseInt(myIPParts[0]);
+                const secondOctet = parseInt(myIPParts[1]);
                 
-                const isPrivateIP = 
+                const isMyIPPrivate = 
                     firstOctet === 10 || 
                     (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) ||
                     (firstOctet === 192 && secondOctet === 168);
 
-                // If user is on private network, show other users (they should be on same network via WebRTC)
-                if (isPrivateIP) {
-                    setLocalNetworkUsers(otherUsers);
-                } else {
-                    // Public IP - users might not be on same network
+                if (!isMyIPPrivate) {
+                    // I'm on public IP - don't show any users
+                    console.log('[Network Detection] On public network, hiding all users');
                     setLocalNetworkUsers([]);
+                    setIsCheckingNetwork(false);
+                    return;
                 }
 
+                // My IP is private, now check each peer's subnet
+                const mySubnet = `${myIPParts[0]}.${myIPParts[1]}.${myIPParts[2]}`; // e.g., "192.168.1"
+                console.log('[Network Detection] My subnet:', mySubnet);
+
+                // Filter users who need to share their IP through WebRTC
+                // Since we can't get other users' IPs directly, we'll use a different approach:
+                // Store and share subnet info through Ably presence data
+                const sameNetworkUsers = [];
+                
+                for (const [id, peerUser] of otherUsers) {
+                    // Check if peer has shared their subnet info
+                    if (peerUser.subnet && peerUser.subnet === mySubnet) {
+                        sameNetworkUsers.push([id, peerUser]);
+                        console.log('[Network Detection] Same network user found:', peerUser.displayName, peerUser.subnet);
+                    } else {
+                        console.log('[Network Detection] Different network user:', peerUser.displayName, peerUser.subnet || 'no subnet');
+                    }
+                }
+
+                setLocalNetworkUsers(sameNetworkUsers);
+
             } catch (error) {
-                console.error("Error checking network:", error);
-                // On error, don't show users to be safe
+                console.error("[Network Detection] Error:", error);
+                // On error, don't show users for security
                 setLocalNetworkUsers([]);
             } finally {
                 setIsCheckingNetwork(false);

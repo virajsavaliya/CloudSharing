@@ -133,8 +133,40 @@ export const PresenceProvider = ({ children }) => {
       if (ablyRef.current) ablyRef.current.close();
       setIsConnected(false); setPeers({}); return;
     }
-    const initAbly = () => {
+    const initAbly = async () => {
       try {
+        // Get user's subnet before connecting
+        const getSubnet = async () => {
+          try {
+            const pc = new RTCPeerConnection({ iceServers: [] });
+            pc.createDataChannel('');
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            return new Promise((resolve) => {
+              const timeout = setTimeout(() => resolve(null), 2000);
+              pc.onicecandidate = (e) => {
+                if (e.candidate && e.candidate.candidate) {
+                  const ipMatch = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+                  if (ipMatch && ipMatch[1]) {
+                    clearTimeout(timeout);
+                    pc.close();
+                    const ipParts = ipMatch[1].split('.');
+                    const subnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+                    resolve(subnet);
+                  }
+                }
+              };
+            });
+          } catch (error) {
+            console.error('[Subnet Detection] Error:', error);
+            return null;
+          }
+        };
+
+        const mySubnet = await getSubnet();
+        console.log('[Presence] My subnet:', mySubnet);
+
         const ably = new Ably.Realtime({ authUrl: `/api/ably-token?clientId=${user.uid}` });
         ablyRef.current = ably;
         ably.connection.on('connected', () => {
@@ -151,7 +183,12 @@ export const PresenceProvider = ({ children }) => {
               delete peerConnectionsRef.current[msg.clientId];
             }
           });
-          channel.presence.enter({ displayName: user.displayName, uid: user.uid });
+          // Include subnet in presence data
+          channel.presence.enter({ 
+            displayName: user.displayName, 
+            uid: user.uid,
+            subnet: mySubnet // Share subnet for network matching
+          });
           channel.subscribe('signal', handleSignal);
         });
         ably.connection.on('disconnected', () => { setIsConnected(false); setPeers({}); peerConnectionsRef.current = {}; });
